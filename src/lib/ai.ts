@@ -186,6 +186,121 @@ export async function fetchTodayIntake(): Promise<TodayIntake> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Medical Report Analysis
+// ---------------------------------------------------------------------------
+
+export type BiomarkerStatus = "low" | "normal" | "high" | "critical" | "unknown";
+
+export interface Biomarker {
+  name: string;
+  category: string | null;
+  value: string;
+  unit: string | null;
+  reference_range: {
+    low: number | null;
+    high: number | null;
+    text: string | null;
+  };
+  status: BiomarkerStatus;
+  explanation: string;
+}
+
+export interface ReportAnalysis {
+  report_title: string;
+  report_date: string | null;
+  biomarkers: Biomarker[];
+  summary: string;
+  flags: string | null;
+  confidence: "high" | "medium" | "low";
+  clarifying_question: string | null;
+}
+
+/** Analyze a photo of a medical report (base64 JPEG). */
+export async function analyzeReport(
+  imageBase64: string,
+): Promise<ReportAnalysis> {
+  const headers = await authHeaders();
+  const response = await fetch(`${FUNCTIONS_URL}/analyze-report`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ image: imageBase64 }),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error ?? "Analysis failed");
+  return body as ReportAnalysis;
+}
+
+/**
+ * Persist an analyzed report into the user's health record: one report row plus
+ * a biomarker row per measurement (the longitudinal spine for future phases).
+ */
+export async function saveReport(analysis: ReportAnalysis): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user.id;
+  if (!userId) throw new Error("Not signed in");
+
+  const { data: report, error: reportError } = await supabase
+    .from("medical_reports")
+    .insert({
+      user_id: userId,
+      title: analysis.report_title,
+      report_date: analysis.report_date,
+      summary: analysis.summary,
+      flags: analysis.flags,
+      confidence: analysis.confidence,
+    })
+    .select("id")
+    .single();
+  if (reportError) throw new Error(reportError.message);
+
+  if (analysis.biomarkers.length > 0) {
+    const rows = analysis.biomarkers.map((b) => ({
+      report_id: report.id,
+      user_id: userId,
+      name: b.name,
+      category: b.category,
+      value: b.value,
+      unit: b.unit,
+      ref_low: b.reference_range.low,
+      ref_high: b.reference_range.high,
+      ref_text: b.reference_range.text,
+      status: b.status,
+      explanation: b.explanation,
+      measured_at: analysis.report_date,
+    }));
+    const { error: bioError } = await supabase.from("biomarkers").insert(rows);
+    if (bioError) throw new Error(bioError.message);
+  }
+}
+
+export interface ReportSummary {
+  id: string;
+  title: string;
+  reportDate: string | null;
+  createdAt: Date;
+  confidence: "high" | "medium" | "low" | null;
+  flags: string | null;
+}
+
+/** List the user's saved reports, newest first. */
+export async function fetchReports(): Promise<ReportSummary[]> {
+  const { data, error } = await supabase
+    .from("medical_reports")
+    .select("id, title, report_date, created_at, confidence, flags")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    reportDate: r.report_date,
+    createdAt: new Date(r.created_at),
+    confidence: r.confidence,
+    flags: r.flags,
+  }));
+}
+
 /** Fetch (or generate) today's AI briefing. */
 export async function fetchDailyBriefing(): Promise<string> {
   const headers = await authHeaders();

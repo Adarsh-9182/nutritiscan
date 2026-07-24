@@ -53,6 +53,16 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen
+        name="report"
+        options={{
+          headerShown: true,
+          title: "Medical Report",
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+        }}
+      />
     </Stack>
   );
 }

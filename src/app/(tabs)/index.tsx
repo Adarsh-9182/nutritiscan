@@ -212,6 +212,23 @@ export default function Home() {
           <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </Card>
       </Pressable>
+      <Pressable
+        onPress={() => router.push("/report")}
+        style={{ marginBottom: spacing.sm }}
+      >
+        <Card style={styles.actionCard}>
+          <View style={styles.actionIcon}>
+            <Ionicons name="document-text" size={20} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>Analyze a report</Text>
+            <Text style={styles.actionSubtitle}>
+              Read a blood panel — values explained, saved to your record.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+        </Card>
+      </Pressable>
       <Pressable onPress={() => router.push("/(tabs)/chat")}>
         <Card style={styles.actionCard}>
           <View style={styles.actionIcon}>
