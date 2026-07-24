@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "nutritiscan",
+    "name": "NutritiScan",
     "slug": "nutritiscan",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,9 +28,15 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#1F7A5C",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "NutritiScan uses the camera to scan meals and estimate their nutrition."
         }
       ]
     ],

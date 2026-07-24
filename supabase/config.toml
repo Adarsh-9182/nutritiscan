@@ -1,0 +1,16 @@
+# Supabase project config. `npx supabase link --project-ref <ref>` connects
+# this directory to your hosted project.
+project_id = "nutritiscan"
+
+[functions.chat]
+verify_jwt = true
+
+[functions.daily-briefing]
+verify_jwt = true
+
+[functions.analyze-food]
+verify_jwt = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
