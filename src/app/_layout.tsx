@@ -1,77 +1,58 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { SessionProvider, useSession } from "@/lib/session";
-import { colors } from "@/theme";
+import { View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { PhoneFrame } from "@/components/PhoneFrame";
+import { dark } from "@/theme";
+import { ThemeProvider, useTheme } from "@/theme/context";
 
+/**
+ * The app opens straight onto the question field.
+ *
+ * There is no sign-in and no account. Everything this product
+ * knows lives on the device (src/domain), so there is nothing an
+ * account would unlock — and a health app that asks you to
+ * register before it will tell you anything is asking for trust
+ * it hasn't earned yet.
+ *
+ * The Supabase session layer is still in src/lib/session.tsx if
+ * accounts come back later; nothing imports it today.
+ */
 function RootNavigator() {
-  const { session, profile, loading } = useSession();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-    const inOnboarding = segments[0] === "onboarding";
-
-    if (!session) {
-      // Signed out — the only place to be is the auth flow.
-      if (!inAuthGroup) router.replace("/(auth)/welcome");
-    } else if (!profile) {
-      // Session established but the profile row is still loading. Wait, so we
-      // don't flash the wrong screen for a returning (already-onboarded) user.
-      return;
-    } else if (!profile.onboarding_completed) {
-      // Authenticated but not onboarded — including right after sign in / sign
-      // up, when we're still sitting on an (auth) screen. Move to onboarding.
-      if (!inOnboarding) router.replace("/onboarding");
-    } else if (inAuthGroup || inOnboarding) {
-      // Fully set up — get out of the auth/onboarding flow into the app.
-      router.replace("/(tabs)");
-    }
-  }, [session, profile, loading, segments, router]);
-
-  if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
+  const { palette, scheme } = useTheme();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="report"
-        options={{
-          headerShown: true,
-          title: "Medical Report",
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerShadowVisible: false,
+    <>
+      {/* The status bar has to invert with the theme, or light mode
+          renders white glyphs on a cream background. */}
+      <StatusBar style={scheme === "light" ? "dark" : "light"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.bg },
         }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="(tabs)" />
+        {/* The scanner is a full-screen capture surface, so it
+            presents modally rather than sliding in as a page. */}
+        <Stack.Screen name="scan" options={{ presentation: "fullScreenModal", animation: "fade" }} />
+      </Stack>
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </SessionProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <View style={{ flex: 1, backgroundColor: dark.bg }}>
+          {/* On a wide browser window this centres the app in a
+              phone-width column. On a device it's a passthrough. */}
+          <PhoneFrame>
+            <RootNavigator />
+          </PhoneFrame>
+        </View>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

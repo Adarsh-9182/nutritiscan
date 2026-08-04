@@ -1,490 +1,276 @@
+// ============================================================
+// ASK · HOME
+//
+// The most important screen in the product, and the one that
+// defines the category. It is a QUESTION FIELD, not a dashboard.
+//
+// What is deliberately NOT here:
+//   - no calorie ring, no six-metric grid, no streak
+//   - no "progress" of any kind
+//   - no more than ONE pushed insight
+//
+// The argument: a dashboard asks the user to do the analysis.
+// Six numbers on a screen is six judgements they now have to
+// make about themselves before breakfast. One sentence that
+// already did the analysis, plus a caret, is the whole product.
+//
+// The vertical order is the priority order, and it is the same
+// order a good doctor uses: reassure, then raise the one thing,
+// then invite the question.
+// ============================================================
+
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { Card } from "@/components/Card";
-import { Gauge, ProgressRing } from "@/components/Rings";
-import { Screen } from "@/components/Screen";
-import { fetchDailyBriefing, fetchTodayIntake, TodayIntake } from "@/lib/ai";
-import {
-  deleteMeal,
-  fetchTodayMeals,
-  fetchTodayWaterMl,
-  logWater,
-  MealEntry,
-} from "@/lib/health";
-import { useSession } from "@/lib/session";
-import { colors, elevation, radius, spacing, type } from "@/theme";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useScrollPadding } from "@/components/Screen";
+import { Body, Card, Chip, Display, DotLabel, Eyebrow } from "@/components/ui";
+import { SEEDED_CONVERSATIONS, relativeDay } from "@/domain/conversation";
+import { SUGGESTED_QUESTIONS, greeting, greetingSubtitle, pickInsight } from "@/domain/insight";
+import { DEV } from "@/domain/persona";
+import { RECORDS, formatRecordDate, type RecordKind } from "@/domain/records";
+import { radius, spacing, type } from "@/theme";
+import { usePalette } from "@/theme/context";
 
-const GLASS_ML = 250;
+const RECORD_ICON: Record<RecordKind, keyof typeof Ionicons.glyphMap> = {
+  lab: "document-text-outline",
+  prescription: "medkit-outline",
+  vaccine: "shield-checkmark-outline",
+  imaging: "image-outline",
+  note: "document-outline",
+};
 
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-export default function Home() {
-  const { profile } = useSession();
+export default function AskHome() {
+  const p = usePalette();
   const router = useRouter();
-  const [briefing, setBriefing] = useState<string | null>(null);
-  const [briefingError, setBriefingError] = useState<string | null>(null);
-  const [intake, setIntake] = useState<TodayIntake | null>(null);
-  const [waterMl, setWaterMl] = useState(0);
-  const [meals, setMeals] = useState<MealEntry[]>([]);
+  const insets = useSafeAreaInsets();
+  const pad = useScrollPadding();
+  const [draft, setDraft] = useState("");
 
-  const loadBriefing = useCallback(async () => {
-    setBriefingError(null);
-    try {
-      setBriefing(await fetchDailyBriefing());
-    } catch (err) {
-      setBriefingError(
-        err instanceof Error ? err.message : "Couldn't load your briefing",
-      );
-    }
-  }, []);
+  const insight = pickInsight();
+  const firstName = DEV.name.split(" ")[0];
 
-  useEffect(() => {
-    loadBriefing();
-  }, [loadBriefing]);
-
-  const loadDay = useCallback(() => {
-    fetchTodayIntake().then(setIntake).catch(() => {});
-    fetchTodayWaterMl().then(setWaterMl).catch(() => {});
-    fetchTodayMeals().then(setMeals).catch(() => {});
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadDay();
-    }, [loadDay]),
-  );
-
-  const handleAddWater = () => {
-    const previous = waterMl;
-    setWaterMl(previous + GLASS_ML); // optimistic — a tap should feel instant
-    logWater(GLASS_ML).catch(() => setWaterMl(previous));
+  const ask = (question: string) => {
+    const q = question.trim();
+    if (!q) return;
+    setDraft("");
+    router.push({ pathname: "/ask/[id]", params: { id: "new", q } });
   };
-
-  const handleDeleteMeal = (meal: MealEntry) => {
-    Alert.alert("Delete meal", `Remove "${meal.name}" from today's log?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () =>
-          deleteMeal(meal.id)
-            .then(loadDay)
-            .catch(() => Alert.alert("Couldn't delete", "Please try again.")),
-      },
-    ]);
-  };
-
-  // ---- Derived numbers ------------------------------------------------------
-  const calTarget = profile?.target_calories ?? 0;
-  const eaten = intake?.calories ?? 0;
-  const left = calTarget - eaten;
-  const over = left < 0;
-  const calProgress = calTarget ? eaten / calTarget : 0;
-
-  const proteinTarget = profile?.target_protein_g ?? 0;
-  const proteinEaten = intake?.proteinG ?? 0;
-
-  const waterTarget = profile?.target_water_ml ?? 0;
-
-  const sleepHours = profile?.target_sleep_min
-    ? Math.round(profile.target_sleep_min / 60)
-    : 0;
 
   return (
-    <Screen scroll>
-      <Text style={styles.greeting}>
-        {greeting()}
-        {profile?.display_name ? `, ${profile.display_name}` : ""}.
-      </Text>
-      <Text style={styles.subGreeting}>Here's your day, simplified.</Text>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: p.bg }}
+      contentContainerStyle={{
+        paddingHorizontal: spacing.lg,
+        paddingBottom: pad,
+        paddingTop: insets.top + spacing.lg,
+      }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Identity bar. Small on purpose: the app does not need to
+          announce itself to someone who already opened it. */}
+      <View style={styles.identity}>
+        <Text style={[type.eyebrow, { color: p.accentText }]}>NutritiScan</Text>
+        <Pressable
+          onPress={() => router.push("/you")}
+          accessibilityRole="button"
+          accessibilityLabel="Your profile and settings"
+          style={[styles.avatar, { backgroundColor: p.surface2, borderColor: p.border }]}
+        >
+          <Text style={{ color: p.text2, fontSize: 12, fontWeight: "700" }}>{DEV.initials}</Text>
+        </Pressable>
+      </View>
 
-      {/* Hero — calorie ring */}
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>Today</Text>
-        <View style={styles.heroStats}>
-          <HeroStat label="Target" value={calTarget ? `${calTarget}` : "—"} />
-          <HeroStat label="Eaten" value={`${Math.round(eaten)}`} center />
-          <HeroStat
-            label="Left"
-            value={calTarget ? `${Math.abs(Math.round(left))}` : "—"}
-            align="right"
-          />
-        </View>
+      {/* The greeting. Plain, not performed. */}
+      <Display>{greeting(firstName)}</Display>
+      <Body style={{ marginTop: 8, maxWidth: 320 }}>{greetingSubtitle(insight ? 1 : 0)}</Body>
 
-        <View style={styles.ringWrap}>
-          <ProgressRing
-            progress={calProgress}
-            color={over ? colors.danger : colors.primary}
-            colorBright={over ? "#FDA4AF" : colors.primaryBright}
+      {/* TODAY'S READ — the only thing pushed at the user. Renders
+          nothing at all when nothing clears the bar, rather than
+          filling the slot with a number they already know. */}
+      {insight && (
+        <Card tone="accent" style={{ marginTop: spacing.xl, padding: spacing.base }}>
+          <DotLabel tone="accent">Today&apos;s read</DotLabel>
+          <Text style={[type.body, { color: p.text, marginTop: 10 }]}>{insight.text}</Text>
+          <Pressable
+            onPress={() => router.push(insight.action.href as never)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.inlineAction, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.ringNumber}>
-              {calTarget ? Math.abs(Math.round(left)) : "—"}
+            <Text style={{ color: p.accentText, fontSize: 13.5, fontWeight: "600" }}>
+              {insight.action.label}
             </Text>
-            <Text style={styles.ringUnit}>kcal {over ? "over" : "left"}</Text>
-          </ProgressRing>
+            <Ionicons name="arrow-forward" size={15} color={p.accentText} />
+          </Pressable>
+        </Card>
+      )}
+
+      {/* The ask field. The caret is the real interaction. */}
+      <View style={[styles.askBar, { backgroundColor: p.surface, borderColor: p.border }]}>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Ask anything"
+          placeholderTextColor={p.text3}
+          style={[styles.input, { color: p.text }]}
+          returnKeyType="send"
+          onSubmitEditing={() => ask(draft)}
+          accessibilityLabel="Ask anything about your health"
+        />
+        {/* One control, never two competing primary actions: the
+            button swaps from mic to send the moment there is
+            something to send. */}
+        <Pressable
+          onPress={() => (draft.trim() ? ask(draft) : router.push("/ask/voice"))}
+          accessibilityRole="button"
+          accessibilityLabel={draft.trim() ? "Send question" : "Ask by voice"}
+          style={({ pressed }) => [
+            styles.askButton,
+            { backgroundColor: p.accent, transform: [{ scale: pressed ? 0.95 : 1 }] },
+          ]}
+        >
+          <Ionicons name={draft.trim() ? "arrow-up" : "mic"} size={19} color={p.accentInk} />
+        </Pressable>
+      </View>
+
+      {/* Suggested questions. Three, chosen to show the three
+          things this product does that a tracker can't. */}
+      <View style={styles.chipWrap}>
+        {SUGGESTED_QUESTIONS.map((q) => (
+          <Chip key={q.label} tone="neutral" onPress={() => router.push(q.href as never)}>
+            {q.label}
+          </Chip>
+        ))}
+      </View>
+
+      {/* Earlier conversations */}
+      <View style={{ marginTop: spacing.xxl }}>
+        <Eyebrow>Earlier</Eyebrow>
+        <View style={{ marginTop: spacing.sm }}>
+          {SEEDED_CONVERSATIONS.map((c, i) => (
+            <Pressable
+              key={c.id}
+              onPress={() => router.push({ pathname: "/ask/[id]", params: { id: c.id } })}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.convoRow,
+                {
+                  borderBottomColor: p.border,
+                  borderBottomWidth:
+                    i === SEEDED_CONVERSATIONS.length - 1 ? 0 : StyleSheet.hairlineWidth,
+                },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="sparkles-outline" size={16} color={p.text3} />
+              <Text style={[type.body, { color: p.text, flex: 1 }]} numberOfLines={1}>
+                {c.title}
+              </Text>
+              <Text style={[type.meta, { color: p.text3 }]}>{relativeDay(c.updatedAt)}</Text>
+            </Pressable>
+          ))}
         </View>
       </View>
 
-      {/* Secondary metrics */}
-      <Card style={styles.gaugeCard}>
-        <Gauge
-          label="Protein"
-          value={`${Math.round(proteinEaten)}g`}
-          progress={proteinTarget ? proteinEaten / proteinTarget : 0}
-          color={colors.protein}
-        />
-        <Pressable onPress={handleAddWater} hitSlop={8}>
-          <Gauge
-            label="Water"
-            value={`${(waterMl / 1000).toFixed(1)}L`}
-            progress={waterTarget ? waterMl / waterTarget : 0}
-            color={colors.primary}
-          />
-          <Text style={styles.tapHint}>+ tap</Text>
-        </Pressable>
-        <Gauge
-          label="Sleep"
-          value={sleepHours ? `${sleepHours}h` : "—"}
-          progress={sleepHours ? sleepHours / 9 : 0}
-          color={colors.carbs}
-        />
-      </Card>
-
-      {/* Daily AI Briefing */}
-      <Card style={styles.briefingCard}>
-        <View style={styles.briefingHeader}>
-          <Ionicons name="sparkles" size={15} color={colors.primary} />
-          <Text style={styles.briefingTitle}>Today's Briefing</Text>
+      {/* Health timeline. A strip, not a screen. Its job here is to
+          prove the app remembers — every row states what the app
+          already did with the document, which is the difference
+          between storage and an assistant. */}
+      <View style={{ marginTop: spacing.xxl }}>
+        <View style={styles.sectionHead}>
+          <Eyebrow>Your timeline</Eyebrow>
+          <Pressable onPress={() => router.push("/records")} accessibilityRole="button">
+            <Text style={{ color: p.accentText, fontSize: 13, fontWeight: "600" }}>All records</Text>
+          </Pressable>
         </View>
-        {briefing ? (
-          <Text style={styles.briefingText}>{briefing}</Text>
-        ) : briefingError ? (
-          <View style={{ gap: spacing.sm }}>
-            <Text style={styles.briefingText}>
-              I couldn't prepare your briefing right now.
-            </Text>
-            <Pressable onPress={loadBriefing}>
-              <Text style={styles.retry}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.briefingLoading}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.briefingLoadingText}>
-              Your AI is preparing today's plan…
-            </Text>
-          </View>
-        )}
-      </Card>
 
-      {/* Quick actions */}
-      <Text style={styles.sectionTitle}>Quick actions</Text>
-      <Pressable
-        onPress={() => router.push("/(tabs)/scan")}
-        style={{ marginBottom: spacing.sm }}
-      >
-        <Card style={styles.actionCard}>
-          <View style={styles.actionIcon}>
-            <Ionicons name="scan" size={20} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Scan a meal</Text>
-            <Text style={styles.actionSubtitle}>
-              {intake?.mealCount
-                ? `${intake.mealCount} meal${intake.mealCount > 1 ? "s" : ""} logged today.`
-                : "Photo in, calories and macros out."}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </Card>
-      </Pressable>
-      <Pressable
-        onPress={() => router.push("/report")}
-        style={{ marginBottom: spacing.sm }}
-      >
-        <Card style={styles.actionCard}>
-          <View style={styles.actionIcon}>
-            <Ionicons name="document-text" size={20} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Analyze a report</Text>
-            <Text style={styles.actionSubtitle}>
-              Read a blood panel — values explained, saved to your record.
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </Card>
-      </Pressable>
-      <Pressable onPress={() => router.push("/(tabs)/chat")}>
-        <Card style={styles.actionCard}>
-          <View style={styles.actionIcon}>
-            <Ionicons
-              name="chatbubble-ellipses"
-              size={20}
-              color={colors.primary}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Ask your AI</Text>
-            <Text style={styles.actionSubtitle}>
-              Meals, workouts, sleep — anything about your health.
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-        </Card>
-      </Pressable>
-
-      {/* Today's meals */}
-      {meals.length > 0 ? (
-        <>
-          <Text style={styles.sectionTitle}>Today's meals</Text>
-          <Card style={{ paddingVertical: spacing.xs }}>
-            {meals.map((meal, i) => (
-              <View
-                key={meal.id}
-                style={[styles.mealRow, i > 0 && styles.mealRowBorder]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.mealName} numberOfLines={1}>
-                    {meal.name}
-                  </Text>
-                  <Text style={styles.mealMeta}>
-                    {meal.loggedAt.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {"  ·  "}
-                    {meal.calories} kcal · {Math.round(meal.proteinG)}g protein
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => handleDeleteMeal(meal)}
-                  hitSlop={8}
-                  style={styles.mealDelete}
-                >
-                  <Ionicons
-                    name="trash-outline"
-                    size={18}
-                    color={colors.textTertiary}
-                  />
-                </Pressable>
+        <Card>
+          {RECORDS.slice(0, 3).map((r, i) => (
+            <Pressable
+              key={r.id}
+              onPress={() => r.href && router.push(r.href as never)}
+              disabled={!r.href}
+              style={({ pressed }) => [
+                styles.timelineRow,
+                i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border },
+                pressed && r.href ? { backgroundColor: p.surface2 } : null,
+              ]}
+            >
+              <View style={[styles.timelineIcon, { backgroundColor: p.surface2, borderColor: p.border }]}>
+                <Ionicons name={RECORD_ICON[r.kind]} size={15} color={p.text3} />
               </View>
-            ))}
-          </Card>
-        </>
-      ) : null}
-    </Screen>
-  );
-}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[type.body, { color: p.text, fontWeight: "600" }]} numberOfLines={1}>
+                  {r.title}
+                </Text>
+                <Text style={[type.meta, { color: p.text3, marginTop: 2 }]} numberOfLines={1}>
+                  {formatRecordDate(r.date)} · {r.did}
+                </Text>
+              </View>
+              {r.href && <Ionicons name="chevron-forward" size={15} color={p.text3} />}
+            </Pressable>
+          ))}
+        </Card>
+      </View>
 
-function HeroStat({
-  label,
-  value,
-  center,
-  align,
-}: {
-  label: string;
-  value: string;
-  center?: boolean;
-  align?: "right";
-}) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Text
-        style={[
-          styles.heroStatValue,
-          center && { textAlign: "center" },
-          align === "right" && { textAlign: "right" },
-        ]}
-      >
-        {value}
+      <Text style={[type.meta, { color: p.text3, marginTop: spacing.xxl }]}>
+        NutritiScan is an educational companion, not a doctor. It explains, it never diagnoses.
       </Text>
-      <Text
-        style={[
-          styles.heroStatLabel,
-          center && { textAlign: "center" },
-          align === "right" && { textAlign: "right" },
-        ]}
-      >
-        {label}
-      </Text>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  greeting: {
-    ...type.largeTitle,
-    color: colors.text,
-    marginTop: spacing.md,
+  identity: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.xl,
   },
-  subGreeting: {
-    ...type.body,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-
-  // Hero
-  hero: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.backgroundElevated,
-    borderRadius: radius.xxl,
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-    ...elevation.card,
-  },
-  eyebrow: {
-    ...type.eyebrow,
-    color: colors.textSecondary,
-  },
-  heroStats: {
-    flexDirection: "row",
-    marginTop: spacing.md,
-  },
-  heroStatValue: {
-    ...type.num,
-    fontSize: 19,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  heroStatLabel: {
-    ...type.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  ringWrap: {
-    alignItems: "center",
-    marginTop: spacing.md,
-  },
-  ringNumber: {
-    ...type.hero,
-    color: colors.text,
-    lineHeight: 58,
-  },
-  ringUnit: {
-    ...type.captionMedium,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-
-  // Gauges
-  gaugeCard: {
-    marginTop: spacing.sm,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-start",
-    paddingVertical: spacing.lg,
-  },
-  tapHint: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: colors.primary,
-    textAlign: "center",
-    marginTop: 2,
-  },
-
-  // Briefing
-  briefingCard: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.primarySoft,
-    borderColor: "rgba(52,211,153,0.22)",
-  },
-  briefingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  briefingTitle: {
-    ...type.captionMedium,
-    color: colors.primary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  briefingText: {
-    ...type.body,
-    color: colors.text,
-  },
-  briefingLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  briefingLoadingText: {
-    ...type.caption,
-    color: colors.textSecondary,
-  },
-  retry: {
-    ...type.bodyMedium,
-    color: colors.primary,
-  },
-
-  sectionTitle: {
-    ...type.heading,
-    color: colors.text,
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
-  },
-  actionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  actionTitle: {
-    ...type.bodyMedium,
-    color: colors.text,
-  },
-  actionSubtitle: {
-    ...type.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  mealRow: {
+  inlineAction: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.md },
+  askBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    padding: 8,
+    paddingLeft: spacing.base,
+    marginTop: spacing.base,
   },
-  mealRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  input: { flex: 1, fontSize: 15, paddingVertical: 8 },
+  askButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  mealName: {
-    ...type.bodyMedium,
-    color: colors.text,
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
+  convoRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: 14 },
+  sectionHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: spacing.sm,
   },
-  mealMeta: {
-    ...type.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  mealDelete: {
-    padding: spacing.xs,
+  timelineRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
