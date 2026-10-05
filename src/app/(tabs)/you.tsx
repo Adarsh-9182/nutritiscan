@@ -84,7 +84,7 @@ export default function You() {
         </Card>
         <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
           <Button title="Open health history" icon="document-text-outline" variant="secondary" onPress={() => router.push("/records")} style={{ flex: 1 }} />
-          <Button title="Doctor summary" icon="share-outline" variant="secondary" onPress={() => router.push("/doctor-summary" as never)} style={{ flex: 1 }} />
+          <Button title="Doctor summary" icon="share-outline" variant="secondary" onPress={() => router.push("/doctor-summary")} style={{ flex: 1 }} />
         </View>
       </View>
 

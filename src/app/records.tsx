@@ -5,7 +5,7 @@ import { Card, Chip, Eyebrow, H1, Meta } from "@/components/ui";
 import { FormField } from "@/components/FormField";
 import { ScreenHeader, useScrollPadding } from "@/components/Screen";
 import { useLocalHealth } from "@/lib/localHealth";
-import { MedicalRecordKind } from "@/domain/healthData";
+import type { MedicalRecordKind } from "@/domain/healthData";
 import { spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
 import { useState } from "react";
@@ -20,7 +20,7 @@ export default function Records() {
       <Eyebrow tone="accent">YOUR RECORD, YOUR CONTROL</Eyebrow>
       <H1 style={{ marginTop: spacing.sm }}>A clearer health history.</H1>
       <Meta style={{ marginTop: spacing.sm, lineHeight: 20 }}>Save visits, medicines, conditions, allergies and test results you want to remember. Entries are stored on this device and are not checked by a clinician.</Meta>
-      <Pressable accessibilityRole="button" onPress={() => router.push("/doctor-summary" as never)} style={{ marginTop: spacing.lg }}>
+      <Pressable accessibilityRole="button" onPress={() => router.push("/doctor-summary")} style={{ marginTop: spacing.lg }}>
         <Card tone="evidence" style={{ padding: spacing.base, flexDirection: "row", alignItems: "center", gap: spacing.md }}>
           <Ionicons name="document-text-outline" size={22} color={p.evidenceText} />
           <View style={{ flex: 1 }}><Text style={[type.body, { color: p.text, fontWeight: "700" }]}>Prepare for a doctor visit</Text><Meta>Review and share a summary from your saved history</Meta></View>

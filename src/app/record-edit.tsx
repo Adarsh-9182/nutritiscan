@@ -1,11 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Modal, ScrollView, Text, View } from "react-native";
 import { Button, Card, Chip, Eyebrow, H1, Meta } from "@/components/ui";
 import { FormField } from "@/components/FormField";
 import { ScreenHeader, useScrollPadding } from "@/components/Screen";
-import { isCalendarDate, type MedicalRecordKind } from "@/domain/healthData";
+import { isCalendarDate, type MedicalRecord, type MedicalRecordKind } from "@/domain/healthData";
 import { useLocalHealth } from "@/lib/localHealth";
 import { spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
@@ -17,10 +17,17 @@ const kinds: { id: MedicalRecordKind; label: string; icon: keyof typeof Ionicons
 ];
 const localDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 export default function RecordEdit() {
+  const p = usePalette(); const router = useRouter(); const params = useLocalSearchParams<{ id?: string; kind?: MedicalRecordKind }>();
+  const { medicalRecords, ready } = useLocalHealth(); const existing = params.id ? medicalRecords.find((item) => item.id === params.id) : undefined;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader title="Health history" backTo="/records" /><Meta style={{ margin: spacing.lg }}>Loading your saved history…</Meta></View>;
+  if (params.id && !existing) return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader title="Health history" backTo="/records" /><Card style={{ margin: spacing.lg, padding: spacing.lg }}><Eyebrow>ITEM NOT FOUND</Eyebrow><Meta style={{ marginTop: spacing.sm }}>This item may have been removed.</Meta><Button title="Back to history" onPress={() => router.replace("/records")} style={{ marginTop: spacing.md }} /></Card></View>;
+  return <RecordForm key={params.id ?? `new-${params.kind ?? "visit"}`} existing={existing ?? null} requestedKind={params.kind} />;
+}
+
+function RecordForm({ existing, requestedKind }: { existing: MedicalRecord | null; requestedKind?: MedicalRecordKind }) {
   const p = usePalette(); const router = useRouter(); const pad = useScrollPadding(); const scroll = useRef<ScrollView>(null);
-  const params = useLocalSearchParams<{ id?: string; kind?: MedicalRecordKind }>(); const { medicalRecords, ready, saveMedicalRecord, deleteMedicalRecord } = useLocalHealth();
-  const existing = useMemo(() => params.id ? medicalRecords.find((item) => item.id === params.id) : undefined, [params.id, medicalRecords]);
-  const [kind, setKind] = useState<MedicalRecordKind>(existing?.kind ?? (kinds.some((item) => item.id === params.kind) ? params.kind! : "visit"));
+  const { saveMedicalRecord, deleteMedicalRecord } = useLocalHealth();
+  const [kind, setKind] = useState<MedicalRecordKind>(existing?.kind ?? (kinds.some((item) => item.id === requestedKind) ? requestedKind! : "visit"));
   const [title, setTitle] = useState(existing?.title ?? ""); const [date, setDate] = useState(existing?.date ?? localDate());
   const [clinician, setClinician] = useState(existing?.clinician ?? ""); const [facility, setFacility] = useState(existing?.facility ?? ""); const [notes, setNotes] = useState(existing?.notes ?? "");
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false); const [confirmDelete, setConfirmDelete] = useState(false);
@@ -34,8 +41,6 @@ export default function RecordEdit() {
     finally { setBusy(false); }
   };
   const remove = async () => { if (!existing || busy) return; setBusy(true); try { await deleteMedicalRecord(existing.id); setConfirmDelete(false); router.replace("/records"); } catch { setError("Could not remove this record. Try again."); } finally { setBusy(false); } };
-  if (!ready) return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader title="Health history" backTo="/records" /><Meta style={{ margin: spacing.lg }}>Loading your saved history…</Meta></View>;
-  if (params.id && !existing) return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader title="Health history" backTo="/records" /><Card style={{ margin: spacing.lg, padding: spacing.lg }}><Eyebrow>ITEM NOT FOUND</Eyebrow><Meta style={{ marginTop: spacing.sm }}>This item may have been removed.</Meta><Button title="Back to history" onPress={() => router.replace("/records")} style={{ marginTop: spacing.md }} /></Card></View>;
   return <View style={{ flex: 1, backgroundColor: p.bg }}>
     <ScreenHeader title={existing ? "Edit history item" : "Add to health history"} backTo="/records" />
     <ScrollView ref={scroll} style={{ flex: 1, height: 0, overflow: "scroll" }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: pad }} keyboardShouldPersistTaps="handled">

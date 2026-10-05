@@ -16,7 +16,7 @@ Open `http://localhost:8081` for the phone-width browser preview. Run `npm start
 ## Working features
 
 - Profile with optional age, measurements, allergies, conditions and personal goals.
-- Manual health history for visits, medicines, conditions, allergies, tests and procedures. Entries are searchable by date in a simple timeline and can be edited or removed.
+- Manual health history for visits, medicines, conditions, allergies, tests and procedures. Entries appear in a searchable dated timeline and can be edited or removed.
 - Doctor-visit summary generated from the details the user entered, with a place to add questions. The preview labels the source and asks users to verify the details before sharing.
 - Manual meal logging with optional nutrition values, edit/repeat/remove and date-based history.
 - Barcode lookup using Open Food Facts. Label values remain distinct from user-entered clinical history.
