@@ -1,93 +1,43 @@
-# NutritiScan
+# NutritiScan mobile
 
-**Your AI Health Operating System.**
+NutritiScan is a local-first personal health history and nutrition journal built with React Native and Expo. The current app supports a manual health timeline, an appointment summary assembled from user-entered facts, meal logging, barcode product lookup, and data backup. It does not diagnose, prescribe, or interpret medical reports.
 
-An AI health companion built as a React Native (Expo) app with a Supabase backend and Claude-powered intelligence. v1 ships the Jarvis core: conversational onboarding, an AI chat with long-term memory, a daily AI briefing, and personalized daily targets.
+## Run locally
 
-## Architecture
-
-```
-┌─ Expo app (this repo) ── zero business logic in UI
-│   src/app/        Screens (expo-router): auth → onboarding → tabs
-│   src/engines/    Client-safe logic (daily target computation)
-│   src/lib/        Supabase client, AI transport (SSE streaming)
-│   src/theme/      Design system (8pt grid, calm palette)
-│
-└─ Supabase ── auth, Postgres (RLS on every table), edge functions
-    supabase/migrations/          Schema: profiles, conversations,
-                                  messages, memories, daily_briefings,
-                                  meals, water_logs, weight_logs, sleep_logs
-    supabase/functions/chat       Claude Opus 4.8, streaming, save_memory tool
-    supabase/functions/daily-briefing   One AI briefing per user per day, cached
-    supabase/functions/analyze-food     Claude vision → structured macro estimate
-```
-
-**The Anthropic API key never touches the client.** All AI calls go through edge functions; the mobile app only holds the Supabase anon key, and Row Level Security scopes every row to its owner.
-
-**Memory model** (per the product spec's four levels):
-
-| Level | Where |
-|---|---|
-| 1 — Conversation | `conversations` + `messages` tables, replayed into each request |
-| 2 — Daily | `daily_briefings` (one per user per day) |
-| 3 — Long-term | `memories` table — the AI writes facts via a `save_memory` tool; users can review and delete them in Profile |
-| 4 — Knowledge | The model itself (RAG comes later) |
-
-## Setup
-
-### 1. Supabase project
-
-1. Create a project at [database.new](https://database.new).
-2. Link and push the schema:
-
-   ```sh
-   npx supabase login
-   npx supabase link --project-ref YOUR-PROJECT-REF
-   npx supabase db push
-   ```
-
-3. Set the AI secret and deploy the functions:
-
-   ```sh
-   npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
-   npx supabase functions deploy chat
-   npx supabase functions deploy daily-briefing
-   npx supabase functions deploy analyze-food
-   ```
-
-4. (Recommended for development) In the Supabase dashboard → Authentication → Providers → Email, disable **Confirm email** so sign-up works without an email loop.
-
-### 2. App
+Expo SDK 57 requires Node.js 22.13 or newer. See the [versioned Expo SDK 57 reference](https://docs.expo.dev/versions/v57.0.0/) for platform requirements.
 
 ```sh
-cp .env.example .env   # fill in EXPO_PUBLIC_SUPABASE_URL + ANON_KEY
-npm install
-npx expo start
+npm ci
+npm run web -- --port 8081 --localhost
 ```
 
-Open in Expo Go (scan the QR) or an iOS/Android simulator.
+Open `http://localhost:8081` for the phone-width browser preview. Run `npm start` to open the Expo app on a device or simulator.
 
-## What works in v1
+## Working features
 
-- Email sign-up / sign-in (Supabase Auth, session persisted)
-- Conversational onboarding — one question at a time, computes calorie/protein/water/sleep targets (Mifflin-St Jeor)
-- Home dashboard — daily AI briefing (generated once per day, cached) + targets
-- AI chat — streaming responses from Claude Opus 4.8, full conversation history, long-term memory the AI maintains itself
-- Profile — personal details, goals, a transparent "what your AI remembers" list with per-memory delete, medical disclaimer, sign out
-- **Food photo scanner** — take/pick a photo → Claude vision identifies items, portions, calories, and macros with an honest confidence rating; asks a clarifying question when uncertain (answer it to refine the estimate); one tap logs the meal
-- Home shows today's consumed calories/protein against targets (updates as you log)
-- Progress tab — educational placeholder (next milestone)
+- Profile with optional age, measurements, allergies, conditions and personal goals.
+- Manual health history for visits, medicines, conditions, allergies, tests and procedures. Entries are searchable by date in a simple timeline and can be edited or removed.
+- Doctor-visit summary generated from the details the user entered, with a place to add questions. The preview labels the source and asks users to verify the details before sharing.
+- Manual meal logging with optional nutrition values, edit/repeat/remove and date-based history.
+- Barcode lookup using Open Food Facts. Label values remain distinct from user-entered clinical history.
+- JSON export/import for the local profile, health history and meal journal.
+- Dark, light and system appearance choices.
 
-## Roadmap (from the product spec)
+## Data and limits
 
-1. **Nutrition tracking depth** — water logging, meal history view, progress rings
-2. **Progress analytics** — AI-summarized trends
-3. **Workouts** — adaptive plans + tracking
-4. Wearables, grocery scanner, premium tier
+Profile, health history and meals are stored in local app storage on the device. NutritiScan does not encrypt that storage, sync it, or send health history to an AI service. Barcode lookup sends the scanned product code to Open Food Facts. Export only leaves the device if the user chooses a destination in the share sheet or saves the downloaded file.
 
-## Engineering notes
+Medical-history items and appointment summaries use only details entered by the user. They are not verified against a source report. Document upload/OCR, AI summarization, cloud backup, Apple Health, medication interaction checks and clinician tools are not connected in this build. No free model is currently running in the app. The `supabase/` directory is an earlier backend prototype and is not called by the active mobile flow.
 
-- Edge functions are Deno; they're excluded from the app's `tsc` typecheck and are validated at deploy time by the Supabase CLI.
-- The chat function runs a manual agentic loop: streams text to the client while executing `save_memory` tool calls server-side (max 5 iterations).
-- Prompt caching: the stable persona block carries `cache_control`; per-user context follows it so the cache prefix survives across requests.
-- Streaming transport is `expo/fetch` (supports streaming bodies on native) parsing SSE frames.
+Before a hosted AI model can process health details, the product needs explicit consent, a secure service boundary, defined retention/deletion, provenance for every extracted fact, human verification, safety evaluation and jurisdiction-specific legal review. A free model license does not make inference hosting or health-data handling free or safe by itself.
+
+## Checks
+
+```sh
+npm test
+npm run lint
+npx tsc --noEmit
+npx expo export --platform all
+```
+
+Tests cover local-date meal totals, barcode nutrition parsing, safe local-store migration, medical history validation and appointment-summary wording.

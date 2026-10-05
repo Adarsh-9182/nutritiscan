@@ -8,7 +8,8 @@
     "scheme": "nutritiscan",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.adarsh.nutritiscan"
     },
     "android": {
       "adaptiveIcon": {
@@ -46,7 +47,16 @@
       ],
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "NutritiScan uses the camera to read product barcodes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

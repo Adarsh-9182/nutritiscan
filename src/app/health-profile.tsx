@@ -1,164 +1,67 @@
-// ============================================================
-// HEALTH MEMORY — WHAT THE ASSISTANT KNOWS
-//
-// This screen exists because of one question users ask about
-// every AI product and almost never get answered: WHAT DOES IT
-// ACTUALLY KNOW ABOUT ME?
-//
-// So it shows exactly that — fact by fact, each with WHERE IT
-// CAME FROM. A fact you told it, a fact it read out of a
-// document, and a fact it derived are three different things with
-// three different reliabilities, and collapsing them into one
-// list is how "you're gluten sensitive" ends up sitting next to
-// something the model inferred on a Tuesday.
-//
-// "Not recorded" is shown as a first-class value rather than
-// hidden. An empty field is information: it tells the user why an
-// answer was vague, and it is the most direct invitation to
-// improve it.
-// ============================================================
-
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ScreenBody, ScreenHeader, Section } from "@/components/Screen";
-import { Badge, Body, Card } from "@/components/ui";
-import { JULY_PANEL, attentionMarkers } from "@/domain/labs";
-import { DEV, PROTEIN_TARGET, SLEEP, hoursLabel } from "@/domain/persona";
+import { useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/Screen";
+import { FormField } from "@/components/FormField";
+import { Button, Card, Eyebrow, Meta } from "@/components/ui";
+import { useLocalHealth, type HealthProfile } from "@/lib/localHealth";
 import { spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
-
-/** Where a fact came from — and therefore how much to trust it. */
-type Origin = "you" | "document" | "device" | "derived";
-
-const ORIGIN_LABEL: Record<Origin, string> = {
-  you: "You told us",
-  document: "From a document",
-  device: "Connected source",
-  derived: "Worked out",
-};
-
-const ORIGIN_TONE: Record<Origin, "steady" | "evidence" | "neutral"> = {
-  you: "steady",
-  document: "evidence",
-  device: "evidence",
-  derived: "neutral",
-};
-
-type Fact = { label: string; value: string; origin: Origin; href?: string };
-
-export default function HealthProfile() {
-  const p = usePalette();
-  const router = useRouter();
-
-  const bmi = +(DEV.weightKg / Math.pow(DEV.heightCm / 100, 2)).toFixed(1);
-  const sleepNow = SLEEP.points[SLEEP.points.length - 1].v;
-
-  const groups: { title: string; facts: Fact[] }[] = [
-    {
-      title: "Body",
-      facts: [
-        { label: "Age", value: String(DEV.age), origin: "you" },
-        { label: "Height", value: `${DEV.heightCm} cm`, origin: "you" },
-        { label: "Weight", value: `${DEV.weightKg} kg`, origin: "device" },
-        { label: "BMI", value: String(bmi), origin: "derived" },
-      ],
-    },
-    {
-      title: "Goals",
-      facts: DEV.goals.map((g) => ({
-        label: g.label,
-        value: g.marker ? "Tied to a marker" : "No marker",
-        origin: "you" as Origin,
-        href: g.marker ? `/labs/${g.marker}` : undefined,
-      })),
-    },
-    {
-      title: "Constraints",
-      facts: [
-        { label: "Restrictions", value: DEV.restrictions.join(", ") || "None recorded", origin: "you" },
-        { label: "Conditions", value: DEV.conditions.join(", ") || "None recorded", origin: "you" },
-        {
-          label: "Medicines",
-          value: "Ferrous fumarate 210 mg",
-          origin: "document",
-          href: "/medicine/ferrous-fumarate-210",
-        },
-      ],
-    },
-    {
-      title: "Habits",
-      facts: [
-        { label: "Sleep", value: `${hoursLabel(sleepNow)} a night`, origin: "device" },
-        { label: "Protein target", value: `${PROTEIN_TARGET} g/day`, origin: "you" },
-        { label: "Training", value: "Not recorded", origin: "you" },
-        { label: "Resting heart rate", value: "Not recorded", origin: "device" },
-      ],
-    },
-    {
-      title: "Labs the assistant reasons from",
-      facts: attentionMarkers(JULY_PANEL).map((m) => ({
-        label: m.name,
-        value: `${m.value} ${m.unit}`,
-        origin: "document" as Origin,
-        href: `/labs/${m.id}`,
-      })),
-    },
-  ];
-
-  return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <ScreenHeader backTo="/you" title="Health profile" />
-
-      <ScreenBody>
-        <Body style={{ marginTop: spacing.base }}>
-          This is what the assistant knows about you, and where each fact came from. It reasons only from
-          what&apos;s here — anything marked{" "}
-          <Text style={{ color: p.text }}>not recorded</Text> is a gap it will say it can&apos;t fill rather
-          than guess at.
-        </Body>
-
-        {groups.map((group) => (
-          <Section key={group.title} title={group.title}>
-            <Card>
-              {group.facts.map((f, i) => {
-                const missing = /not recorded|none recorded/i.test(f.value);
-                return (
-                  <Pressable
-                    key={f.label}
-                    onPress={() => f.href && router.push(f.href as never)}
-                    disabled={!f.href}
-                    style={({ pressed }) => [
-                      styles.row,
-                      i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border },
-                      pressed && f.href ? { backgroundColor: p.surface2 } : null,
-                    ]}
-                  >
-                    <Text style={[type.body, { color: p.text2, flex: 1 }]}>{f.label}</Text>
-                    <Text style={[type.meta, { color: missing ? p.text3 : p.text }]}>{f.value}</Text>
-                    <Badge tone={ORIGIN_TONE[f.origin]}>{ORIGIN_LABEL[f.origin]}</Badge>
-                  </Pressable>
-                );
-              })}
-            </Card>
-          </Section>
-        ))}
-
-        <Text style={[type.meta, { color: p.text3, marginTop: spacing.xl }]}>
-          A shortened version of this profile is what makes answers personal. Your documents are not sent
-          anywhere — only the values read out of them.
-        </Text>
-      </ScreenBody>
-    </View>
-  );
+function csv(value: string) { return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))]; }
+function optionalNumber(value: string, label: string, min: number, max: number) {
+  if (!value.trim()) return undefined;
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) throw new Error(`${label} should be a number.`);
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > max) throw new Error(`${label} should be between ${min} and ${max}.`);
+  if (label === "Age" && !Number.isInteger(number)) throw new Error("Enter your age in whole years.");
+  return number;
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.base,
-    paddingVertical: 12,
-    flexWrap: "wrap",
-  },
-});
+export default function HealthProfileScreen() {
+  const p = usePalette(); const { ready, error, retry, profile } = useLocalHealth();
+  if (!ready) return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader title="Your profile" backTo="/you" /><View style={{ padding: spacing.lg }}><Meta>{error || "Loading your saved profile…"}</Meta>{!!error && <Button title="Retry loading" onPress={() => void retry()} />}</View></View>;
+  return <ProfileForm profile={profile} />;
+}
+function ProfileForm({ profile }: { profile: HealthProfile | null }) {
+  const p = usePalette(); const router = useRouter(); const insets = useSafeAreaInsets(); const { saveProfile } = useLocalHealth();
+  const [name, setName] = useState(profile?.name ?? "");
+  const [age, setAge] = useState(profile?.age?.toString() ?? "");
+  const [height, setHeight] = useState(profile?.heightCm?.toString() ?? "");
+  const [weight, setWeight] = useState(profile?.weightKg?.toString() ?? "");
+  const [allergies, setAllergies] = useState(profile?.allergies.join(", ") ?? "");
+  const [conditions, setConditions] = useState(profile?.conditions.join(", ") ?? "");
+  const [goals, setGoals] = useState(profile?.goals.join(", ") ?? "");
+  const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const scroll = useRef<ScrollView>(null);
+  const save = async () => {
+    if (saving) return;
+    setSaving(true); setError("");
+    try {
+      if (name.trim().length < 2 || name.trim().length > 60) throw new Error("Enter a name between 2 and 60 characters.");
+      await saveProfile({ name: name.trim(), age: optionalNumber(age, "Age", 18, 120), heightCm: optionalNumber(height, "Height", 90, 250), weightKg: optionalNumber(weight, "Weight", 25, 350), allergies: csv(allergies), conditions: csv(conditions), goals: csv(goals) });
+      if (router.canGoBack()) router.back(); else router.replace("/you");
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not save your profile. Try again."); requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true })); }
+    finally { setSaving(false); }
+  };
+  return <KeyboardAvoidingView style={{ flex: 1, minHeight: 0, backgroundColor: p.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <ScreenHeader backTo="/you" title={profile ? "Edit your profile" : "Make it yours"} />
+    <ScrollView ref={scroll} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }} keyboardShouldPersistTaps="handled">
+      <Meta style={{ lineHeight: 20 }}>Start with your name. Everything else is optional, and stays on this device.</Meta>
+      <Card style={{ marginTop: spacing.lg, padding: spacing.base }}>
+        <Eyebrow>ABOUT YOU</Eyebrow>
+        <FormField label="Name" value={name} onChangeText={setName} placeholder="What should we call you?" maxLength={60} autoComplete="name" />
+        <View style={{ flexDirection: "row", gap: spacing.md }}><View style={{ flex: 1 }}><FormField label="Age · 18+" value={age} onChangeText={setAge} placeholder="Optional" keyboardType="number-pad" maxLength={3} /></View><View style={{ flex: 1 }}><FormField label="Height · cm" value={height} onChangeText={setHeight} placeholder="Optional" keyboardType="decimal-pad" maxLength={6} /></View></View>
+        <FormField label="Weight · kg" value={weight} onChangeText={setWeight} placeholder="Optional" keyboardType="decimal-pad" maxLength={6} />
+      </Card>
+      <Card style={{ marginTop: spacing.md, padding: spacing.base }}>
+        <Eyebrow>YOUR CONTEXT</Eyebrow>
+        <FormField label="Food allergies or restrictions" value={allergies} onChangeText={setAllergies} placeholder="Separate items with commas" maxLength={240} />
+        <FormField label="Health conditions · optional" value={conditions} onChangeText={setConditions} placeholder="Separate items with commas" maxLength={240} />
+        <FormField label="Your goals · optional" value={goals} onChangeText={setGoals} placeholder="e.g. regular meals, track protein" maxLength={240} />
+        <Meta style={{ marginTop: spacing.md, lineHeight: 18 }}>These are your notes. The app does not use them to diagnose conditions, suggest medication, or verify food safety.</Meta>
+      </Card>
+      {!!error && <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: spacing.md }]}>{error}</Text>}
+      <Button variant="primary" title={saving ? "Saving…" : "Save profile"} icon="checkmark" disabled={saving} onPress={() => void save()} style={{ marginTop: spacing.lg }} />
+      <Meta style={{ marginTop: spacing.md, textAlign: "center", lineHeight: 18 }}>Clear an optional field to remove it. Export or clear all your data from You.</Meta>
+    </ScrollView>
+  </KeyboardAvoidingView>;
+}

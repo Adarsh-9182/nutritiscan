@@ -1,32 +1,15 @@
-// ============================================================
-// YOU · PROFILE & SETTINGS
-//
-// "Goals live at the top because they're what the assistant
-// reasons from. Training on personal data is off by default and
-// says so."
-//
-// The ordering is an argument about what a settings screen is
-// for. Most put identity first and preferences below, mirroring
-// the database. This puts GOALS first, because goals are the
-// input to every answer the product gives — a user who wants to
-// understand why the app said something looks here, and finding
-// "Raise ferritin, Lower LDL" is the explanation.
-//
-// On privacy: the copy describes what actually happens, in plain
-// words, including the unflattering parts. A product asking for
-// the most sensitive data a person has does not get to be vague
-// about where it goes.
-// ============================================================
-
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { STORAGE_KEY } from "@/domain/healthData";
+import { exportBackup, readBackup } from "@/lib/backup";
+import { FormField } from "@/components/FormField";
 import { useScrollPadding } from "@/components/Screen";
-import { Badge, Card, Divider, Eyebrow, H1, Row } from "@/components/ui";
-import { DEV } from "@/domain/persona";
-import { RECORDS, formatLongDate } from "@/domain/records";
+import { Button, Card, Divider, Eyebrow, H1, Meta } from "@/components/ui";
+import { useLocalHealth } from "@/lib/localHealth";
 import { radius, spacing, type } from "@/theme";
 import { useTheme, usePalette, type ThemeChoice } from "@/theme/context";
 
@@ -36,236 +19,146 @@ export default function You() {
   const insets = useSafeAreaInsets();
   const pad = useScrollPadding();
   const { choice, setChoice } = useTheme();
+  const { profile, meals, trash, medicalRecords, ready, deleteAll, importData, error, retry } = useLocalHealth();
+  const [working, setWorking] = useState(false);
 
-  const [keepOnDevice, setKeepOnDevice] = useState(true);
-  const [improveAnswers, setImproveAnswers] = useState(false);
-
-  const confirmDelete = () =>
-    Alert.alert(
-      "Delete everything?",
-      "This removes every record, logged meal, conversation and setting from this device. It cannot be undone, and there is no cloud copy to restore from.",
-      [
-        { text: "Keep it", style: "cancel" },
-        { text: "Delete everything", style: "destructive", onPress: () => {} },
-      ],
-    );
+  const [message, setMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const exportData = async () => {
+    if (working) return;
+    setWorking(true); setActionError(""); setMessage("");
+    try {
+      const raw = error ? await AsyncStorage.getItem(STORAGE_KEY) : JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), profile, meals, trash, medicalRecords }, null, 2);
+      if (!raw) throw new Error("There is no saved data to export yet.");
+      await exportBackup(raw);
+      setMessage("Backup prepared. Keep the file somewhere private; it contains your journal and profile.");
+    } catch (err) { setActionError(err instanceof Error ? err.message : "Could not export data. Your journal is still saved here."); }
+    finally { setWorking(false); }
+  };
+  const restoreBackup = async () => {
+    if (!ready || working) return;
+    setWorking(true); setActionError(""); setMessage("");
+    try {
+      const raw = await readBackup();
+      if (raw === null) return;
+      await importData(raw);
+      setMessage("Backup imported. New journal and health history entries were added; existing entries and your current profile were kept.");
+    } catch (err) { setActionError(err instanceof Error ? err.message : "Could not import that backup. Current data was kept."); }
+    finally { setWorking(false); }
+  };
+  const eraseData = async () => {
+    if (confirmText !== "DELETE" || working) return;
+    setWorking(true); setActionError("");
+    try { await deleteAll(); setConfirmVisible(false); setConfirmText(""); setMessage("Your profile, meal journal and health history have been cleared from this device."); }
+    catch { setActionError("Could not clear data. Please try again."); }
+    finally { setWorking(false); }
+  };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: p.bg }}
-      contentContainerStyle={{
-        paddingHorizontal: spacing.lg,
-        paddingBottom: pad,
-        paddingTop: insets.top + spacing.lg,
-      }}
-      showsVerticalScrollIndicator={false}
-    >
+    <>
+    <ScrollView style={{ flex: 1, height: 0, overflow: "scroll", backgroundColor: p.bg }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: pad, paddingTop: insets.top + spacing.lg }} showsVerticalScrollIndicator={false}>
+      <Eyebrow tone="accent">YOUR SPACE</Eyebrow>
       <View style={styles.identity}>
-        <View style={[styles.avatar, { backgroundColor: p.accentSoft }]}>
-          <Text style={{ color: p.accentText, fontSize: 15, fontWeight: "700" }}>{DEV.initials}</Text>
-        </View>
+        <View style={[styles.avatar, { backgroundColor: p.accentSoft }]}><Text style={{ color: p.accentText, fontSize: 15, fontWeight: "700" }}>{profile?.name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "?"}</Text></View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <H1>{DEV.name}</H1>
-          <Text style={[type.meta, { color: p.text3, marginTop: 2 }]}>
-            {DEV.age} · {DEV.heightCm} cm · {DEV.weightKg} kg · gluten-free
-          </Text>
+          <H1>{profile?.name || "Your profile"}</H1>
+          <Meta style={{ marginTop: 3 }}>{profile ? [profile.age ? `${profile.age} years` : null, profile.heightCm ? `${profile.heightCm} cm` : null, profile.weightKg ? `${profile.weightKg} kg` : null].filter(Boolean).join(" · ") || "Profile saved on this device" : "No profile details added yet"}</Meta>
         </View>
       </View>
 
-      {/* Goals first: this is what the assistant reasons from. */}
-      <Card style={{ padding: spacing.base }}>
-        <Eyebrow>What we&apos;re optimising for</Eyebrow>
-        <View style={styles.goalWrap}>
-          {DEV.goals.map((g) =>
-            g.marker ? (
-              <Pressable
-                key={g.id}
-                onPress={() => router.push({ pathname: "/labs/[marker]", params: { marker: g.marker! } })}
-              >
-                <Badge tone="accent">{g.label}</Badge>
-              </Pressable>
-            ) : (
-              <Badge key={g.id}>{g.label}</Badge>
-            ),
-          )}
-        </View>
-        <Text style={[type.meta, { color: p.text3, marginTop: spacing.md }]}>
-          Last reviewed {formatLongDate(DEV.goalsReviewed)}. We&apos;ll ask again when a new panel arrives.
-        </Text>
-      </Card>
+      <Button title={profile ? "Edit your profile" : "Create your profile"} variant="primary" icon="person-outline" onPress={() => router.push("/health-profile")} />
 
-      {/* Memory */}
-      <View style={{ marginTop: spacing.xxl }}>
-        <Eyebrow>Health memory</Eyebrow>
+      <View style={{ marginTop: spacing.xxl }}><Eyebrow>Health memory</Eyebrow>
         <Card style={{ marginTop: spacing.sm }}>
-          <Row
-            icon="person-outline"
-            title="Health profile"
-            detail="Body, goals, habits, and where each fact came from"
-            onPress={() => router.push("/health-profile")}
-          />
+          <InfoRow icon="alert-circle-outline" title="Allergies & restrictions" value={profile?.allergies.join(", ") || "None added"} />
           <Divider />
-          <Row icon="alert-circle-outline" title="Allergies & conditions" value={DEV.restrictions.join(", ")} />
+          <InfoRow icon="heart-outline" title="Conditions" value={profile?.conditions.join(", ") || "None added"} />
           <Divider />
-          <Row
-            icon="document-text-outline"
-            title="Medical records"
-            value={`${RECORDS.length} documents`}
-            onPress={() => router.push("/records")}
-          />
+          <InfoRow icon="flag-outline" title="Your goals" value={profile?.goals.join(", ") || "None added"} />
           <Divider />
-          <Row
-            icon="medkit-outline"
-            title="Medicines"
-            value="1 active"
-            onPress={() =>
-              router.push({ pathname: "/medicine/[id]", params: { id: "ferrous-fumarate-210" } })
-            }
-          />
+          <InfoRow icon="restaurant-outline" title="Saved meals" value={ready ? String(meals.length) : "Loading…"} />
           <Divider />
-          <Row icon="heart-outline" title="Connected sources" value="Apple Health" />
+          <InfoRow icon="document-text-outline" title="Health history" value={ready ? String(medicalRecords.length) : "Loading…"} />
         </Card>
-      </View>
-
-      {/* Privacy, stated plainly */}
-      <View style={{ marginTop: spacing.xxl }}>
-        <Eyebrow>Privacy</Eyebrow>
-        <Card style={{ marginTop: spacing.sm }}>
-          <ToggleRow
-            label="Keep records on device"
-            detail="No cloud copy of your files"
-            value={keepOnDevice}
-            onChange={setKeepOnDevice}
-          />
-          <Divider />
-          <ToggleRow
-            label="Use my data to improve answers"
-            detail="Off by default"
-            value={improveAnswers}
-            onChange={setImproveAnswers}
-          />
-        </Card>
-
-        {/* The honest version, not the reassuring version. */}
-        <View style={[styles.note, { backgroundColor: p.surface, borderColor: p.border }]}>
-          <Ionicons name="lock-closed-outline" size={14} color={p.text3} style={{ marginTop: 2 }} />
-          <Text style={[type.meta, { color: p.text3, flex: 1 }]}>
-            Your health data lives on this device. It is not encrypted at rest and it is not synced anywhere.
-            Questions you ask are sent to a model provider to be answered, along with the profile summary
-            above — the documents themselves are not.
-          </Text>
+        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
+          <Button title="Open health history" icon="document-text-outline" variant="secondary" onPress={() => router.push("/records")} style={{ flex: 1 }} />
+          <Button title="Doctor summary" icon="share-outline" variant="secondary" onPress={() => router.push("/doctor-summary" as never)} style={{ flex: 1 }} />
         </View>
       </View>
 
-      {/* Appearance */}
-      <View style={{ marginTop: spacing.xxl }}>
-        <Eyebrow>Appearance</Eyebrow>
+      <View style={{ marginTop: spacing.xxl }}><Eyebrow>Appearance</Eyebrow>
         <View style={[styles.segmented, { backgroundColor: p.surface2, borderColor: p.border }]}>
-          {(["dark", "light", "system"] as ThemeChoice[]).map((c) => {
-            const on = choice === c;
-            return (
-              <Pressable
-                key={c}
-                onPress={() => setChoice(c)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                style={[styles.segment, on && { backgroundColor: p.surface }]}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: on ? p.text : p.text3,
-                    fontWeight: on ? "600" : "400",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {c}
-                </Text>
-              </Pressable>
-            );
+          {(["dark", "light", "system"] as ThemeChoice[]).map((value) => {
+            const selected = choice === value;
+            return <Pressable key={value} onPress={() => setChoice(value)} accessibilityRole="radio" accessibilityState={{ selected }} style={[styles.segment, selected && { backgroundColor: p.surface }]}>
+              <Text style={{ fontSize: 13, color: selected ? p.text : p.text3, fontWeight: selected ? "600" : "400", textTransform: "capitalize" }}>{value}</Text>
+            </Pressable>;
           })}
         </View>
       </View>
 
-      {/* Ownership. Deletion is a first-class action. */}
-      <View style={{ marginTop: spacing.xxl }}>
-        <Eyebrow>Your data</Eyebrow>
+      <View style={{ marginTop: spacing.xxl }}><Eyebrow>Your data</Eyebrow>
         <Card style={{ marginTop: spacing.sm }}>
-          <Row icon="download-outline" title="Export everything" detail="One file, yours to keep" onPress={() => {}} />
+          <InfoRow icon="phone-portrait-outline" title="Stored on this device" value="No account or cloud sync" />
           <Divider />
-          <Row
-            icon="trash-outline"
-            tone="attention"
-            title="Delete everything"
-            detail="Removes every record, meal and answer from this device"
-            onPress={confirmDelete}
-          />
+          <Pressable onPress={exportData} disabled={working} accessibilityRole="button" style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.65 }]}>
+            <Ionicons name="share-outline" size={18} color={p.accentText} />
+            <View style={{ flex: 1 }}><Text style={[type.body, { color: p.text, fontWeight: "600" }]}>{working ? "Working…" : "Export my data"}</Text><Meta>Save a JSON backup of your profile, history and meals</Meta></View>
+            <Ionicons name="chevron-forward" size={16} color={p.text3} />
+          </Pressable>
+          <Divider />
+          <Pressable onPress={() => void restoreBackup()} disabled={!ready || working} accessibilityRole="button" style={styles.actionRow}>
+            <Ionicons name="download-outline" size={18} color={p.accentText} />
+            <View style={{ flex: 1 }}><Text style={[type.body, { color: p.text, fontWeight: "600" }]}>Import a backup</Text><Meta>Add missing entries without replacing your data</Meta></View>
+          </Pressable>
+          <Divider />
+          <Pressable onPress={() => { setConfirmText(""); setConfirmVisible(true); }} disabled={working} accessibilityRole="button" style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.65 }]}>
+            <Ionicons name="trash-outline" size={18} color={p.attentionText} />
+            <View style={{ flex: 1 }}><Text style={[type.body, { color: p.attentionText, fontWeight: "600" }]}>Delete my health data</Text><Meta>Remove your profile and meal journal</Meta></View>
+            <Ionicons name="chevron-forward" size={16} color={p.text3} />
+          </Pressable>
         </Card>
+        <View style={[styles.privacy, { backgroundColor: p.surface2, borderColor: p.border }]}>
+          <Ionicons name="lock-closed-outline" size={15} color={p.text3} />
+          <Text style={[type.meta, { color: p.text3, flex: 1, lineHeight: 18 }]}>This build saves your profile, health history and meal journal on this device. Barcode lookup sends only a product code to Open Food Facts. Your health data is not sent or synced. Local app storage is not encrypted by NutritiScan.</Text>
+        </View>
       </View>
 
-      <Text style={[type.meta, { color: p.text3, marginTop: spacing.xl }]}>
-        NutritiScan is an educational companion. It explains your data and helps you prepare questions — it
-        does not diagnose, prescribe, or replace the clinician who knows you.
-      </Text>
+      {!!error && <Card tone="attention" style={{ marginTop: spacing.lg, padding: spacing.base }}><Meta>{error}</Meta><Button title="Retry loading" onPress={() => void retry()} style={{ marginTop: spacing.sm }} /></Card>}
+      {!!message && <Text accessibilityLiveRegion="polite" style={[type.meta, { color: p.steadyText, marginTop: spacing.lg, lineHeight: 19 }]}>{message}</Text>}
+      {!!actionError && <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: spacing.lg }]}>{actionError}</Text>}
+      <Text style={[type.meta, { color: p.text3, marginTop: spacing.xl, lineHeight: 18 }]}>NutritiScan is a record-keeping companion. It does not diagnose, prescribe, or replace a licensed clinician.</Text>
     </ScrollView>
+    <Modal visible={confirmVisible} transparent animationType="fade" onRequestClose={() => { if (!working) setConfirmVisible(false); }}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "center", alignItems: "center", padding: spacing.lg }}>
+        <Card style={{ width: "100%", maxWidth: 380, padding: spacing.lg }}>
+          <Eyebrow tone="attention">CLEAR LOCAL DATA</Eyebrow>
+          <Text style={[type.h3, { color: p.text, marginTop: spacing.md }]}>Delete your health data?</Text>
+          <Meta style={{ marginTop: spacing.md, lineHeight: 20 }}>This permanently removes your profile, saved meals and health history on this device. Export a backup first if you want to keep a copy.</Meta>
+          <FormField label="Type DELETE to confirm" value={confirmText} onChangeText={setConfirmText} autoCapitalize="characters" placeholder="DELETE" />
+          {!!actionError && <Meta style={{ color: p.attentionText, marginTop: spacing.sm }}>{actionError}</Meta>}
+          <Button variant="primary" title={working ? "Clearing…" : "Delete all data"} disabled={confirmText !== "DELETE" || working} onPress={() => void eraseData()} style={{ marginTop: spacing.lg }} />
+          <Button title="Cancel" variant="secondary" disabled={working} onPress={() => setConfirmVisible(false)} style={{ marginTop: spacing.sm }} />
+        </Card>
+      </View>
+    </Modal>
+    </>
   );
 }
 
-function ToggleRow({
-  label,
-  detail,
-  value,
-  onChange,
-}: {
-  label: string;
-  detail: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function InfoRow({ icon, title, value }: { icon: keyof typeof Ionicons.glyphMap; title: string; value: string }) {
   const p = usePalette();
-  return (
-    <View style={styles.toggleRow}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[type.body, { color: p.text, fontWeight: "600" }]}>{label}</Text>
-        <Text style={[type.meta, { color: p.text3, marginTop: 2 }]}>{detail}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: p.surface3, true: p.accent }}
-        thumbColor="#fff"
-        accessibilityLabel={label}
-      />
-    </View>
-  );
+  return <View style={styles.infoRow}><Ionicons name={icon} size={17} color={p.text3} /><Text style={[type.body, { color: p.text, flex: 1, fontWeight: "600" }]}>{title}</Text><Text style={[type.meta, { color: p.text3, maxWidth: 130, textAlign: "right" }]} numberOfLines={2}>{value}</Text></View>;
 }
 
 const styles = StyleSheet.create({
-  identity: { flexDirection: "row", alignItems: "center", gap: spacing.base, marginBottom: spacing.xl },
-  avatar: { width: 56, height: 56, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
-  goalWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
-  note: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  segmented: {
-    flexDirection: "row",
-    gap: 4,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    padding: 4,
-    marginTop: spacing.sm,
-  },
-  segment: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: radius.sm },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.base,
-    paddingHorizontal: spacing.base,
-    paddingVertical: 14,
-  },
+  identity: { flexDirection: "row", alignItems: "center", gap: spacing.md, marginVertical: spacing.lg },
+  avatar: { width: 48, height: 48, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
+  segmented: { flexDirection: "row", borderWidth: 1, borderRadius: radius.md, padding: 4, marginTop: spacing.md },
+  segment: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.sm },
+  infoRow: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.base, paddingVertical: spacing.sm },
+  actionRow: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.base, paddingVertical: spacing.md },
+  privacy: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginTop: spacing.md },
 });

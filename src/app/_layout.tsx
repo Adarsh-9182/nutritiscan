@@ -5,19 +5,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PhoneFrame } from "@/components/PhoneFrame";
 import { dark } from "@/theme";
 import { ThemeProvider, useTheme } from "@/theme/context";
+import { LocalHealthProvider } from "@/lib/localHealth";
 
-/**
- * The app opens straight onto the question field.
- *
- * There is no sign-in and no account. Everything this product
- * knows lives on the device (src/domain), so there is nothing an
- * account would unlock — and a health app that asks you to
- * register before it will tell you anything is asking for trust
- * it hasn't earned yet.
- *
- * The Supabase session layer is still in src/lib/session.tsx if
- * accounts come back later; nothing imports it today.
- */
+// Local-first journal. Cloud AI and the legacy Supabase layer are not active.
 function RootNavigator() {
   const { palette, scheme } = useTheme();
 
@@ -33,8 +23,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" />
-        {/* The scanner is a full-screen capture surface, so it
-            presents modally rather than sliding in as a page. */}
+        {/* Meal entry presents above the journal tabs. */}
         <Stack.Screen name="scan" options={{ presentation: "fullScreenModal", animation: "fade" }} />
       </Stack>
     </>
@@ -45,13 +34,15 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <View style={{ flex: 1, backgroundColor: dark.bg }}>
-          {/* On a wide browser window this centres the app in a
-              phone-width column. On a device it's a passthrough. */}
-          <PhoneFrame>
-            <RootNavigator />
-          </PhoneFrame>
-        </View>
+        <LocalHealthProvider>
+          <View style={{ flex: 1, backgroundColor: dark.bg }}>
+            {/* On a wide browser window this centres the app in a
+                phone-width column. On a device it's a passthrough. */}
+            <PhoneFrame>
+              <RootNavigator />
+            </PhoneFrame>
+          </View>
+        </LocalHealthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

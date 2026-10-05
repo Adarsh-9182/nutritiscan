@@ -105,7 +105,7 @@ export function ScreenBody({
   const pad = useScrollPadding(extraBottom);
   return (
     <ScrollView
-      style={[{ flex: 1, backgroundColor: p.bg }, style]}
+      style={[{ flex: 1, height: 0, overflow: "scroll", backgroundColor: p.bg }, style]}
       contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: pad }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}

@@ -36,7 +36,7 @@ import { LineChart } from "@/components/charts";
 import { ScreenHeader } from "@/components/Screen";
 import { ThinkingDots } from "@/components/states";
 import { Badge, Card, Chip } from "@/components/ui";
-import { conversationById, type Turn } from "@/domain/conversation";
+import type { Turn } from "@/domain/conversation";
 import { askDemoBrain } from "@/lib/brain";
 import { layout, radius, spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
@@ -45,10 +45,9 @@ export default function Conversation() {
   const p = usePalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, q } = useLocalSearchParams<{ id: string; q?: string }>();
+  const { q } = useLocalSearchParams<{ id: string; q?: string }>();
 
-  const seeded = conversationById(String(id));
-  const [turns, setTurns] = useState<Turn[]>(seeded?.turns ?? []);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -61,8 +60,7 @@ export default function Conversation() {
     setTurns((t) => [...t, { id: `u-${Date.now()}`, role: "user", text: question }]);
     setThinking(true);
 
-    // The reply is composed by the on-device brain, which answers
-    // only from what is actually recorded. See src/lib/brain.ts.
+    // The reply stays on-device and explains which capabilities are active.
     setTimeout(() => {
       setTurns((t) => [...t, askDemoBrain(question)]);
       setThinking(false);
@@ -87,8 +85,7 @@ export default function Conversation() {
     >
       <ScreenHeader
         backTo="/"
-        title={seeded?.title ?? (q ? String(q).slice(0, 32) : "New question")}
-        trailing={seeded?.basis ? <Text style={[type.meta, { color: p.text3 }]}>{seeded.basis}</Text> : undefined}
+        title={q ? String(q).slice(0, 32) : "Health question"}
       />
 
       <ScrollView
@@ -107,8 +104,8 @@ export default function Conversation() {
 
         {thinking && (
           <View style={styles.thinking}>
-            <ThinkingDots label="Reading your health memory" />
-            <Text style={[type.meta, { color: p.text3 }]}>Reading your health memory</Text>
+            <ThinkingDots label="Preparing an on-device reply" />
+            <Text style={[type.meta, { color: p.text3 }]}>Preparing an on-device reply</Text>
           </View>
         )}
       </ScrollView>

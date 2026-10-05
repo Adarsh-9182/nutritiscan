@@ -1,297 +1,149 @@
-// ============================================================
-// CAPTURE — ONE CAMERA, FIVE THINGS IT UNDERSTANDS
-//
-// "The user shouldn't pick a scanner mode — but they should be
-// able to."
-//
-// That is the whole interaction model. Auto is the default and
-// the mode strip is an ESCAPE HATCH, not a decision the user is
-// asked to make before they can start. Most scanner UIs get this
-// backwards: they open on a mode picker, forcing the user to
-// classify their own photo before the app that exists to classify
-// things has looked at it.
-//
-// The status pill is the other load-bearing piece. Recognition
-// takes seconds; a still viewfinder for that long reads as a
-// freeze. Narrating the stage ("Reading the label") turns the
-// same wait into visible work.
-// ============================================================
-
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StatusPill } from "@/components/states";
-import { SAMPLE_MEAL, type Verdict } from "@/domain/meal";
+import { FormField } from "@/components/FormField";
+import { Button, Card, Chip, Eyebrow, H1, Meta } from "@/components/ui";
+import { localDateKey, mealDate, parseOptionalNutrition, type MealLog } from "@/domain/journal";
+import { scaleProduct, type LabelProduct } from "@/domain/products";
+import { lookupProduct } from "@/lib/products";
+import { useLocalHealth } from "@/lib/localHealth";
 import { radius, spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
-import { FoodVerdict } from "@/components/FoodVerdict";
-
-type Mode = "auto" | "food" | "barcode" | "label" | "report" | "medicine";
-
-const MODES: { id: Mode; label: string }[] = [
-  { id: "food", label: "Food" },
-  { id: "barcode", label: "Barcode" },
-  { id: "label", label: "Label" },
-  { id: "report", label: "Report" },
-  { id: "medicine", label: "Medicine" },
-];
-
-/** What the status pill says while each mode is working. */
-const NARRATION: Record<Mode, string[]> = {
-  auto: ["Looking at the image", "Identifying what it is", "Checking your health memory"],
-  food: ["Identifying the food", "Matching the nutrition database", "Checking your health memory"],
-  barcode: ["Reading the barcode", "Looking up the product", "Checking your restrictions"],
-  label: ["Reading the label", "Extracting the panel", "Checking your restrictions"],
-  report: ["Reading the report", "Matching markers"],
-  medicine: ["Reading the packaging", "Checking interactions"],
-};
 
 export default function Scan() {
-  const p = usePalette();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ mode?: string }>();
-
-  const [mode, setMode] = useState<Mode>((params.mode as Mode) ?? "auto");
-  const [busy, setBusy] = useState(false);
-  const [narration, setNarration] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [verdict, setVerdict] = useState<Verdict | null>(null);
-
-  const run = useCallback(
-    async (uri: string | null) => {
-      // Report and medicine are documents, not meals — they route
-      // to their own readers rather than through the food pipeline.
-      if (mode === "report") {
-        router.replace("/labs/reading");
-        return;
-      }
-      if (mode === "medicine") {
-        router.replace({ pathname: "/medicine/[id]", params: { id: "ferrous-fumarate-210" } });
-        return;
-      }
-
-      setPreview(uri);
-      setBusy(true);
-
-      // Narrate real stages rather than showing a spinner that
-      // means nothing.
-      const stages = NARRATION[mode];
-      for (const stage of stages) {
-        setNarration(stage);
-        await new Promise((r) => setTimeout(r, 700));
-      }
-
-      setVerdict(SAMPLE_MEAL());
-      setBusy(false);
-    },
-    [mode, router],
-  );
-
-  /**
-   * Open the camera, or the library, or the library *because* the
-   * camera was refused.
-   *
-   * Resolved as a flat decision rather than by recursing: a
-   * denied camera is not an error state — the library is a
-   * complete path on its own, so we fall through to it instead of
-   * blocking the user behind a permission they declined.
-   */
-  const pick = useCallback(
-    async (source: "camera" | "library") => {
-      let useCamera = source === "camera";
-
-      if (useCamera) {
-        const cam = await ImagePicker.requestCameraPermissionsAsync();
-        if (!cam.granted) useCamera = false;
-      }
-
-      if (!useCamera) {
-        const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!lib.granted) return;
-      }
-
-      const result = useCamera
-        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
-        : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 });
-
-      if (result.canceled) return;
-      await run(result.assets[0]?.uri ?? null);
-    },
-    [run],
-  );
-
-  if (verdict) {
-    return (
-      <FoodVerdict
-        verdict={verdict}
-        preview={preview}
-        onRescan={() => {
-          setVerdict(null);
-          setPreview(null);
-        }}
-      />
-    );
-  }
-
-  return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.base }]}>
-      {/* Top bar */}
-      <View style={styles.top}>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 15, fontWeight: "600" }}>Cancel</Text>
-        </Pressable>
-
-        {busy ? (
-          <StatusPill onDark>{narration}</StatusPill>
-        ) : (
-          <Text style={[type.eyebrow, { color: "rgba(255,255,255,0.45)" }]}>
-            {mode === "auto" ? "Auto-detecting" : MODES.find((m) => m.id === mode)?.label}
-          </Text>
-        )}
-
-        <Ionicons name="sparkles-outline" size={18} color="rgba(255,255,255,0.6)" />
-      </View>
-
-      {/* Viewfinder */}
-      <View style={styles.viewfinder}>
-        {preview && <Image source={{ uri: preview }} style={StyleSheet.absoluteFill} resizeMode="cover" />}
-
-        <Pressable
-          onPress={() => !busy && pick("library")}
-          style={styles.reticle}
-          accessibilityRole="button"
-          accessibilityLabel="Choose a photo"
-        >
-          {/* Corner brackets rather than a full frame — a closed
-              rectangle reads as a crop tool. */}
-          {([
-            { top: 0, left: 0, borderTopWidth: 2, borderLeftWidth: 2, borderTopLeftRadius: radius.md },
-            { top: 0, right: 0, borderTopWidth: 2, borderRightWidth: 2, borderTopRightRadius: radius.md },
-            { bottom: 0, left: 0, borderBottomWidth: 2, borderLeftWidth: 2, borderBottomLeftRadius: radius.md },
-            { bottom: 0, right: 0, borderBottomWidth: 2, borderRightWidth: 2, borderBottomRightRadius: radius.md },
-          ] as const).map((corner, i) => (
-            <View key={i} style={[styles.corner, corner, { borderColor: p.accent }]} />
-          ))}
-
-          {!preview && (
-            <View style={styles.hint}>
-              <Ionicons name="image-outline" size={26} color="rgba(255,255,255,0.5)" />
-              <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 15, marginTop: 10 }}>
-                Point at your food
-              </Text>
-              <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, marginTop: 2 }}>
-                or tap to browse
-              </Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
-
-      {/* Mode strip. An escape hatch, not a decision. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.modeStrip}
-      >
-        {[{ id: "auto" as Mode, label: "Auto" }, ...MODES].map((m) => {
-          const on = mode === m.id;
-          return (
-            <Pressable
-              key={m.id}
-              onPress={() => setMode(m.id)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              style={[
-                styles.modeChip,
-                { backgroundColor: on ? p.accent : "rgba(255,255,255,0.12)" },
-              ]}
-            >
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: on ? p.accentInk : "rgba(255,255,255,0.75)",
-                  fontWeight: on ? "600" : "400",
-                }}
-              >
-                {m.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Shutter row */}
-      <View style={[styles.shutterRow, { paddingBottom: insets.bottom + spacing.xxl }]}>
-        <Pressable
-          onPress={() => pick("library")}
-          accessibilityLabel="Choose a photo"
-          style={styles.sideButton}
-        >
-          <Ionicons name="images-outline" size={19} color="rgba(255,255,255,0.85)" />
-        </Pressable>
-
-        <Pressable
-          onPress={() => pick("camera")}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityLabel="Capture"
-          style={({ pressed }) => [
-            styles.shutter,
-            { opacity: busy ? 0.5 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
-          ]}
-        />
-
-        <Pressable
-          onPress={() => router.replace("/ask/voice")}
-          accessibilityLabel="Describe it out loud instead"
-          style={styles.sideButton}
-        >
-          <Ionicons name="mic-outline" size={19} color="rgba(255,255,255,0.85)" />
-        </Pressable>
-      </View>
-    </View>
-  );
+  const p = usePalette(); const router = useRouter(); const params = useLocalSearchParams<{ id?: string; copy?: string }>();
+  const { meals, ready, error, retry } = useLocalHealth();
+  const id = typeof params.id === "string" ? params.id : undefined;
+  const copy = typeof params.copy === "string" ? params.copy : undefined;
+  if (!ready) return <View style={{ flex: 1, backgroundColor: p.bg, padding: spacing.lg }}><H1>Your journal</H1><Meta>{error || "Loading meals…"}</Meta>{!!error && <Button title="Retry loading" onPress={() => void retry()} />}<Button title="Back" onPress={() => router.canGoBack() ? router.back() : router.replace("/")} /></View>;
+  return <MealForm key={id ?? copy ?? "new"} id={id} copy={copy} existing={meals.find((meal) => meal.id === (id ?? copy))} />;
 }
+function MealForm({ id, copy, existing }: { id?: string; copy?: string; existing?: MealLog }) {
+  const p = usePalette(); const router = useRouter(); const insets = useSafeAreaInsets();
+  const { saveMeal, deleteMeal, ready, error: storageError } = useLocalHealth();
+  const [name, setName] = useState(existing?.name ?? "");
+  const [calories, setCalories] = useState(existing?.calories?.toString() ?? "");
+  const [protein, setProtein] = useState(existing?.proteinG?.toString() ?? "");
+  const [carbs, setCarbs] = useState(existing?.carbsG?.toString() ?? "");
+  const [fat, setFat] = useState(existing?.fatG?.toString() ?? "");
+  const [note, setNote] = useState(existing?.note ?? "");
+  const [date, setDate] = useState(localDateKey(id && existing ? new Date(existing.loggedAt) : new Date()));
+  const [time, setTime] = useState((id && existing ? new Date(existing.loggedAt) : new Date()).toTimeString().slice(0, 5));
+  const [source, setSource] = useState<"manual" | "label">(existing?.source ?? "manual");
+  const [savedBarcode, setSavedBarcode] = useState<string | undefined>(existing?.barcode);
+  const [mode, setMode] = useState<"manual" | "barcode">("manual");
+  const [barcode, setBarcode] = useState("");
+  const [product, setProduct] = useState<LabelProduct | null>(null);
+  const [quantity, setQuantity] = useState("100");
+  const [error, setError] = useState("");
+  const [lookupError, setLookupError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const scanned = useRef(false);
+  const requestId = useRef(0);
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => () => { requestId.current += 1; }, []);
+  const close = () => router.canGoBack() ? router.back() : router.replace("/");
+  const lookup = async (input = barcode) => {
+    const request = ++requestId.current;
+    setLookingUp(true); setLookupError(""); setProduct(null); setCameraVisible(false);
+    try { const result = await lookupProduct(input); if (request === requestId.current) { setProduct(result); setQuantity("100"); } }
+    catch (err) { if (request === requestId.current) setLookupError(err instanceof Error ? err.message : "Could not look up this product."); }
+    finally { if (request === requestId.current) setLookingUp(false); }
+  };
+  const openCamera = async () => {
+    try {
+      const access = permission?.granted ? permission : await requestPermission();
+      if (!access.granted) { setLookupError("Camera permission was not granted. You can type the barcode instead."); return; }
+      scanned.current = false; setCameraVisible(true); setLookupError("");
+    } catch { setLookupError("Camera unavailable. Type the barcode from the package instead."); }
+  };
+  const applyLabel = () => {
+    if (!product) return;
+    try {
+      const totals = scaleProduct(product, quantity);
+      setName(product.name); setCalories(totals.calories?.toString() ?? ""); setProtein(totals.proteinG?.toString() ?? "");
+      setCarbs(totals.carbsG?.toString() ?? ""); setFat(totals.fatG?.toString() ?? "");
+      setSource("label"); setSavedBarcode(product.barcode);
+      setNote(`${quantity} ${product.basisUnit} · Open Food Facts label (${product.barcode}). Check against your package.`);
+      setMode("manual"); setProduct(null); setLookupError("");
+    } catch (err) { setLookupError(err instanceof Error ? err.message : "Check the amount."); }
+  };
+  const save = async () => {
+    if (!ready || saving) return;
+    setSaving(true); setError("");
+    try {
+      const mealName = name.trim();
+      if (mealName.length < 2 || mealName.length > 80) throw new Error("Enter a meal name between 2 and 80 characters.");
+      await saveMeal({ name: mealName,
+        calories: parseOptionalNutrition(calories, "Calories"), proteinG: parseOptionalNutrition(protein, "Protein", 1000),
+        carbsG: parseOptionalNutrition(carbs, "Carbohydrate", 2000), fatG: parseOptionalNutrition(fat, "Fat", 1000),
+        note: note.trim() || undefined, loggedAt: mealDate(date, time), source, barcode: savedBarcode }, id);
+      close();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not save this meal. Try again."); requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true })); }
+    finally { setSaving(false); }
+  };
+  const remove = async () => {
+    if (!id || saving) return;
+    setSaving(true);
+    try { await deleteMeal(id); close(); }
+    catch { setError("Could not remove this meal. Your entry has been kept."); }
+    finally { setSaving(false); }
+  };
+  return <KeyboardAvoidingView style={[styles.root, { backgroundColor: p.bg }]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <View style={[styles.top, { paddingTop: insets.top + spacing.sm, borderBottomColor: p.border }]}>
+      <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close meal log" hitSlop={12}><Ionicons name="close" size={24} color={p.text2} /></Pressable>
+      <Eyebrow>FOOD JOURNAL</Eyebrow><View style={{ width: 24 }} />
+    </View>
+    <ScrollView ref={scroll} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl }} keyboardShouldPersistTaps="handled">
+      <H1>{id ? "Edit meal" : copy ? "Log it again" : "What’s on your plate?"}</H1>
+      <Meta style={{ marginTop: spacing.sm, lineHeight: 20 }}>A quick note now. A clearer picture of your week later.</Meta>
+      {!ready ? <Card style={{ marginTop: spacing.lg }}><Meta>{storageError || "Loading your journal…"}</Meta></Card> : id && !existing ? <Card style={{ marginTop: spacing.lg }}><Meta>This meal is no longer in your journal. Find removed meals in History.</Meta><Button title="Back to home" onPress={() => router.replace("/")} /></Card> : <>
+      {!id && <View style={styles.row}><Chip selected={mode === "manual"} onPress={() => { setMode("manual"); setCameraVisible(false); }}>Enter a meal</Chip><Chip selected={mode === "barcode"} onPress={() => setMode("barcode")}>Scan a barcode</Chip></View>}
+      {mode === "barcode" && <Card style={{ marginTop: spacing.lg, padding: spacing.base }}>
+        <Eyebrow>PACKAGED FOOD</Eyebrow><Meta style={{ marginTop: 8, lineHeight: 19 }}>Look up the package barcode. Only the barcode is sent to Open Food Facts; your journal stays here.</Meta>
+        {Platform.OS !== "web" && <Button title={cameraVisible ? "Close camera" : "Use camera"} icon="barcode-outline" variant="secondary" onPress={() => cameraVisible ? setCameraVisible(false) : void openCamera()} style={{ marginTop: spacing.md }} />}
+        {cameraVisible && <View style={{ height: 240, overflow: "hidden", borderRadius: radius.md, marginTop: spacing.md }}><CameraView style={{ flex: 1 }} facing="back" barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a"] }} onMountError={() => { setCameraVisible(false); setLookupError("Could not start the camera. Type the barcode instead."); }} onBarcodeScanned={({ data }) => { if (scanned.current) return; scanned.current = true; setBarcode(data); void lookup(data); }} /></View>}
+        <FormField label="Product barcode" value={barcode} onChangeText={(value) => { setBarcode(value); setProduct(null); }} placeholder="Numbers below the barcode" keyboardType="number-pad" maxLength={20} />
+        <Button variant="primary" title={lookingUp ? "Looking up…" : "Find product"} disabled={lookingUp || !barcode.trim()} onPress={() => void lookup()} style={{ marginTop: spacing.md }} />
+        {!!lookupError && <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: spacing.md }]}>{lookupError}</Text>}
+        {product && <View style={{ marginTop: spacing.lg }}>
+          <Text style={[type.h3, { color: p.text }]}>{product.name}</Text><Meta>{product.brand}</Meta>
+          <Meta style={{ marginTop: spacing.sm }}>Per 100 {product.basisUnit ?? "g/ml"}: {product.calories === undefined ? "calories not available" : `${Math.round(product.calories)} kcal`} · {product.proteinG === undefined ? "protein not available" : `${product.proteinG} g protein`}</Meta>
+          {!!product.allergens && <Meta style={{ marginTop: spacing.sm }}>Listed allergens: {product.allergens}. Verify on the package; this is not a safety check.</Meta>}
+          <FormField label={`Amount you ate · ${product.basisUnit ?? "g/ml"}`} value={quantity} onChangeText={setQuantity} keyboardType="decimal-pad" placeholder="100" />
 
+          <Meta style={{ marginTop: 8, lineHeight: 18 }}>Use the same unit as the package’s per-100 nutrition. Community data can be incomplete; check your label.</Meta>
+          <Button variant="primary" title="Use this portion" icon="checkmark" disabled={!product.basisUnit} onPress={applyLabel} style={{ marginTop: spacing.md }} />
+          <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(product.sourceUrl).catch(() => setLookupError("Could not open the source."))} style={{ paddingVertical: spacing.md }}><Text style={{ color: p.accentText }}>Source: Open Food Facts · ODbL</Text></Pressable>
+        </View>}
+      </Card>}
+      <Card style={{ marginTop: spacing.lg, padding: spacing.base }}>
+        <Eyebrow>YOUR MEAL</Eyebrow>
+        <FormField label="Meal name" value={name} onChangeText={setName} placeholder="e.g. Dal, rice and salad" maxLength={80} />
+        <View style={styles.row}><View style={{ flex: 1 }}><FormField label="Date · YYYY-MM-DD" value={date} onChangeText={setDate} placeholder="2026-10-04" maxLength={10} /></View><View style={{ width: 95 }}><FormField label="Time · HH:MM" value={time} onChangeText={setTime} placeholder="13:30" maxLength={5} /></View></View>
+        <View style={styles.row}><Chip onPress={() => { setDate(localDateKey(new Date())); setTime(new Date().toTimeString().slice(0,5)); }}>Today</Chip><Chip onPress={() => { const when = new Date(); when.setDate(when.getDate()-1); setDate(localDateKey(when)); }}>Yesterday</Chip></View>
+        <View style={styles.row}><View style={{ flex: 1 }}><FormField label="Calories · kcal" value={calories} onChangeText={(v) => { setCalories(v); setSource("manual"); }} placeholder="Optional" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><FormField label="Protein · g" value={protein} onChangeText={(v) => { setProtein(v); setSource("manual"); }} placeholder="Optional" keyboardType="decimal-pad" /></View></View>
+        <View style={styles.row}><View style={{ flex: 1 }}><FormField label="Carbs · g" value={carbs} onChangeText={(v) => { setCarbs(v); setSource("manual"); }} placeholder="Optional" keyboardType="decimal-pad" /></View><View style={{ flex: 1 }}><FormField label="Fat · g" value={fat} onChangeText={(v) => { setFat(v); setSource("manual"); }} placeholder="Optional" keyboardType="decimal-pad" /></View></View>
+        <Meta style={{ marginTop: spacing.md, lineHeight: 18 }}>{source === "label" ? "Portion calculated from Open Food Facts. Review and correct before saving." : "Nutrition is optional. Blank values stay unknown; no targets are assumed."}</Meta>
+        <FormField label="Note · optional" value={note} onChangeText={setNote} placeholder="Portion, ingredients, or preparation" multiline maxLength={500} />
+      </Card>
+      {!!error && <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: spacing.md }]}>{error}</Text>}
+      <Button variant="primary" title={saving ? "Saving…" : id ? "Save changes" : "Save meal"} icon="checkmark" disabled={saving} onPress={() => void save()} style={{ marginTop: spacing.lg }} />
+      {id && <Button title="Remove meal" variant="secondary" icon="trash-outline" disabled={saving} onPress={() => void remove()} style={{ marginTop: spacing.md }} />}
+      {id && <Meta style={{ marginTop: spacing.sm, textAlign: "center" }}>Removed meals can be restored from History.</Meta>}
+      <Meta style={{ marginTop: spacing.lg, textAlign: "center" }}>Saved on this device. No photo recognition or AI advice.</Meta>
+      </>}
+    </ScrollView>
+  </KeyboardAvoidingView>;
+}
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#000" },
-  top: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-  },
-  viewfinder: { flex: 1, justifyContent: "center", overflow: "hidden" },
-  reticle: { marginHorizontal: spacing.xxl, aspectRatio: 4 / 3 },
-  corner: { position: "absolute", width: 36, height: 36 },
-  hint: { flex: 1, alignItems: "center", justifyContent: "center" },
-  modeStrip: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  modeChip: { borderRadius: radius.full, paddingHorizontal: 14, paddingVertical: 9 },
-  shutterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xxxl,
-    paddingTop: spacing.sm,
-  },
-  sideButton: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shutter: {
-    width: 68,
-    height: 68,
-    borderRadius: radius.full,
-    backgroundColor: "#fff",
-    borderWidth: 4,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
+  root: { flex: 1, minHeight: 0 },
+  top: { minHeight: 54, flexShrink: 0, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: "row", gap: spacing.md, marginTop: spacing.sm, flexWrap: "wrap" },
 });
