@@ -8,7 +8,7 @@ on:
         default: v1.1.0-play.1
         type: string
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: play-bundle-${{ inputs.release_tag }}
   cancel-in-progress: false
@@ -74,4 +74,4 @@ jobs:
           set -euo pipefail
           gh release create "$RELEASE_TAG" release/NutritiScan.aab release/Play-Upload-Certificate.pem release/SHA256SUMS \
             --title "NutritiScan $RELEASE_TAG · Google Play testing bundle" \
-            --notes-file docs/google-play-testing.md --prerelease --verify-tag
+            --notes-file docs/google-play-testing.md --prerelease
