@@ -1,0 +1,77 @@
+name: Google Play bundle
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: GitHub prerelease tag for the signed Play bundle
+        required: true
+        default: v1.1.0-play.1
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: play-bundle-${{ inputs.release_tag }}
+  cancel-in-progress: false
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_WEB_ORIGIN: https://nutritiscan.com
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - run: npm ci
+      - run: npm run lint && npm run typecheck && npm test
+      - run: npx expo prebuild --platform android --no-install
+      - run: node scripts/prepare-release.mjs
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build Android App Bundle
+        working-directory: android
+        run: ./gradlew :app:bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64
+      - name: Sign and verify upload bundle
+        env:
+          PLAY_UPLOAD_KEYSTORE: ${{ secrets.PLAY_UPLOAD_KEYSTORE }}
+          PLAY_UPLOAD_PASSWORD: ${{ secrets.PLAY_UPLOAD_PASSWORD }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v1\.1\.0-play\.[1-9][0-9]*$ ]]
+          test -n "$PLAY_UPLOAD_KEYSTORE" && test -n "$PLAY_UPLOAD_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/keystore" release
+          printf '%s' "$PLAY_UPLOAD_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/keystore/play-upload.jks"
+          chmod 600 "$RUNNER_TEMP/keystore/play-upload.jks"
+          cp android/app/build/outputs/bundle/release/app-release.aab release/NutritiScan.aab
+          "$JAVA_HOME/bin/jarsigner" -keystore "$RUNNER_TEMP/keystore/play-upload.jks" -storetype JKS -storepass:env PLAY_UPLOAD_PASSWORD -keypass:env PLAY_UPLOAD_PASSWORD -signedjar release/NutritiScan.signed.aab release/NutritiScan.aab nutritiscan-upload
+          mv release/NutritiScan.signed.aab release/NutritiScan.aab
+          "$JAVA_HOME/bin/jarsigner" -verify release/NutritiScan.aab > "$RUNNER_TEMP/bundle-signature-verification.txt"
+          "$JAVA_HOME/bin/keytool" -exportcert -rfc -alias nutritiscan-upload -keystore "$RUNNER_TEMP/keystore/play-upload.jks" -storetype JKS -storepass:env PLAY_UPLOAD_PASSWORD -file release/Play-Upload-Certificate.pem
+          cd release && shasum -a 256 NutritiScan.aab Play-Upload-Certificate.pem > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nutritiscan-play-signed-bundle
+          path: release/*
+          retention-days: 30
+      - name: Publish signed bundle for Play Console
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" release/NutritiScan.aab release/Play-Upload-Certificate.pem release/SHA256SUMS \
+            --title "NutritiScan $RELEASE_TAG · Google Play testing bundle" \
+            --notes-file docs/google-play-testing.md --prerelease --verify-tag

@@ -20,7 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.adarsh.nutritiscan",
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "output": "static",
