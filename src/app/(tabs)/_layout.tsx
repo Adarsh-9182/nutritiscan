@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { TabList, TabSlot, TabTrigger, Tabs } from "expo-router/ui";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { elevation, layout, radius } from "@/theme";
+import { layout, radius } from "@/theme";
 import { usePalette } from "@/theme/context";
 
 type TabDef = {
@@ -15,7 +15,7 @@ type TabDef = {
 };
 
 const TABS: TabDef[] = [
-  { name: "index", href: "/", label: "Today", icon: "home-outline", iconActive: "home" },
+  { name: "index", href: "/", label: "Ask", icon: "chatbubble-outline", iconActive: "chatbubble" },
   { name: "health", href: "/health", label: "Journal", icon: "pulse-outline", iconActive: "pulse" },
   { name: "you", href: "/you", label: "You", icon: "person-outline", iconActive: "person" },
 ];
@@ -84,7 +84,6 @@ export default function TabsLayout() {
               accessibilityLabel="Add a meal to your journal"
               style={({ pressed }) => [
                 styles.fab,
-                elevation.accent,
                 { backgroundColor: p.accent, transform: [{ scale: pressed ? 0.95 : 1 }] },
               ]}
             >

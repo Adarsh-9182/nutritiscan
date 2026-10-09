@@ -1,43 +1,38 @@
-# NutritiScan mobile
+# NutritiScan · Android
 
-NutritiScan is a local-first personal health history and nutrition journal built with React Native and Expo. The current app supports a manual health timeline, an appointment summary assembled from user-entered facts, meal logging, barcode product lookup, and data backup. It does not diagnose, prescribe, or interpret medical reports.
+NutritiScan is a conversation-first educational health companion for adults 18+, built with Expo SDK 57 and React Native. The midnight/lime/mint design and plus mark match [nutritiscan.com](https://nutritiscan.com).
 
-## Run locally
+[Download the Android APK](https://github.com/Adarsh-9182/nutritiscan/releases) from GitHub Releases. The signed standalone APK includes its JavaScript bundle; Expo Go is not needed.
 
-Expo SDK 57 requires Node.js 22.13 or newer. See the [versioned Expo SDK 57 reference](https://docs.expo.dev/versions/v57.0.0/) for platform requirements.
+## Product surfaces
+
+- **Ask**: public health-chat transport to the website, consent before sending messages, and conversations saved on this device. No local profile or meal journal is silently attached to messages. AI unavailability is disclosed. Emergency phrase checks can run without a provider; they are not a validated triage service.
+- **Reports & shared health**: secure account credential storage, private report upload, explicit storage/cloud consent and review before confirming extracted lab values. Requires the separately deployed FastAPI service in `nutritiscan-ai` to be connected to the web deployment. The app shows the connection status.
+- **Voice**: explicit microphone permission, a bounded voice recording, provider transcription when enabled, then user-edited text before sending. Requires shared-account cloud consent. Keyboard dictation remains available without that service.
+- **Journal / You**: the existing local meal journal, barcode lookup, profile and health history, doctor-visit summary, export/import and deletion remain available. Local journal entries are separate from the shared account and are not automatically synchronized.
+
+Shared backend source and deployment instructions: [nutritiscan-ai/backend](https://github.com/Adarsh-9182/nutritiscan-ai/tree/main/backend).
+
+## Develop
 
 ```sh
 npm ci
-npm run web -- --port 8081 --localhost
-```
-
-Open `http://localhost:8081` for the phone-width browser preview. Run `npm start` to open the Expo app on a device or simulator.
-
-## Working features
-
-- Profile with optional age, measurements, allergies, conditions and personal goals.
-- Manual health history for visits, medicines, conditions, allergies, tests and procedures. Entries appear in a searchable dated timeline and can be edited or removed.
-- Doctor-visit summary generated from the details the user entered, with a place to add questions. The preview labels the source and asks users to verify the details before sharing.
-- Manual meal logging with optional nutrition values, edit/repeat/remove and date-based history.
-- Barcode lookup using Open Food Facts. Label values remain distinct from user-entered clinical history.
-- JSON export/import for the local profile, health history and meal journal.
-- Dark, light and system appearance choices.
-
-## Data and limits
-
-Profile, health history and meals are stored in local app storage on the device. NutritiScan does not encrypt that storage, sync it, or send health history to an AI service. Barcode lookup sends the scanned product code to Open Food Facts. Export only leaves the device if the user chooses a destination in the share sheet or saves the downloaded file.
-
-Medical-history items and appointment summaries use only details entered by the user. They are not verified against a source report. Document upload/OCR, AI summarization, cloud backup, Apple Health, medication interaction checks and clinician tools are not connected in this build. No free model is currently running in the app. The `supabase/` directory is an earlier backend prototype and is not called by the active mobile flow.
-
-Before a hosted AI model can process health details, the product needs explicit consent, a secure service boundary, defined retention/deletion, provenance for every extracted fact, human verification, safety evaluation and jurisdiction-specific legal review. A free model license does not make inference hosting or health-data handling free or safe by itself.
-
-## Checks
-
-```sh
-npm test
+npm start
 npm run lint
-npx tsc --noEmit
-npx expo export --platform all
+npm run typecheck
+npm test
 ```
 
-Tests cover local-date meal totals, barcode nutrition parsing, safe local-store migration, medical history validation and appointment-summary wording.
+The default public endpoint is `https://nutritiscan.com`; `EXPO_PUBLIC_WEB_ORIGIN` can override it for development. Never put model keys, backend credentials or signing materials in public Expo environment variables.
+
+## Android release
+
+The `Android APK` workflow generates native code, checks the app, builds a release bundle, signs the standalone APK with encrypted GitHub Actions secrets and verifies the signature. A `v*` tag publishes a GitHub prerelease with APK and SHA-256 checksums. Workflow dispatch builds an artifact without publishing. The persistent release key is backed up locally under ignored `.credentials/`; preserve it for compatible future updates. Generated `android/` and `ios/` directories remain ignored.
+
+Supported APK architectures are arm64-v8a and x86_64; Android 7+ is required. This beta does not claim Play Store approval or completed clinical validation.
+
+## Data boundaries
+
+Local profile, history, meals and conversations use AsyncStorage and are not encrypted by NutritiScan. Device deletion removes local history/conversations; shared account deletion is separate. Native shared-account access tokens use Expo SecureStore. Public chat sends chosen messages after consent. Shared records require separate storage consent; optional cloud AI processing requires another choice. Do not include real patient information until the service, provider terms, clinical evaluation and privacy controls have been reviewed.
+
+Educational information and record keeping only. No diagnosis, prescribing, medication changes or emergency assessment. In an emergency, contact urgent medical care; in India dial 112.

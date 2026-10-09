@@ -38,14 +38,16 @@ import { ThinkingDots } from "@/components/states";
 import { Badge, Card, Chip } from "@/components/ui";
 import type { Turn } from "@/domain/conversation";
 import { askDemoBrain } from "@/lib/brain";
-import { layout, radius, spacing, type } from "@/theme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { askCompanion, CHAT_CONSENT_KEY, loadChats, saveChat } from "@/lib/companion";
+import { radius, spacing, type } from "@/theme";
 import { usePalette } from "@/theme/context";
 
 export default function Conversation() {
   const p = usePalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { q } = useLocalSearchParams<{ id: string; q?: string }>();
+  const { id, q } = useLocalSearchParams<{ id: string; q?: string }>();
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -53,30 +55,53 @@ export default function Conversation() {
   const scrollRef = useRef<ScrollView>(null);
   const askedSeed = useRef(false);
 
-  const send = (text: string) => {
-    const question = text.trim();
-    if (!question || thinking) return;
-    setDraft("");
-    setTurns((t) => [...t, { id: `u-${Date.now()}`, role: "user", text: question }]);
-    setThinking(true);
-
-    // The reply stays on-device and explains which capabilities are active.
-    setTimeout(() => {
-      setTurns((t) => [...t, askDemoBrain(question)]);
-      setThinking(false);
-    }, 750);
-  };
-
-  // A question arriving via ?q= is asked once, on mount. The ref
-  // guard matters because the effect can re-run in development
-  // and the user would otherwise watch their question be asked
-  // twice.
+  const [consent, setConsent] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const request = useRef<AbortController | null>(null);
+  const pending = useRef(false);
+  const turnsRef = useRef<Turn[]>([]);
+  const chatId = String(id);
   useEffect(() => {
-    if (!q || askedSeed.current) return;
-    askedSeed.current = true;
-    send(String(q));
+    let active = true;
+    Promise.all([loadChats(), AsyncStorage.getItem(CHAT_CONSENT_KEY)]).then(([chats, approved]) => {
+      if (!active) return;
+      const saved = chats.find((chat) => chat.id === chatId)?.turns ?? [];
+      setTurns(saved); turnsRef.current = saved; setConsent(approved === "true"); setLoaded(true);
+    }).catch(() => { if (active) setError("Saved conversations could not be loaded. Nothing was overwritten."); });
+    return () => { active = false; request.current?.abort(); };
+  }, [chatId]);
+  const persist = async (next: Turn[]) => {
+    await saveChat({ id: chatId, title: next.find((t) => t.role === "user")?.text.slice(0, 80) ?? "Health conversation", updatedAt: new Date().toISOString(), turns: next });
+    turnsRef.current = next; setTurns(next);
+  };
+  const send = async (text: string) => {
+    const question = text.trim();
+    if (!question || pending.current || !loaded) return;
+    const urgent = /(can.?t breathe|cannot breathe|chest pain|suicid|kill myself|stroke|severe bleeding|unconscious|passing out)/i.test(question);
+    if (!consent && !urgent) { setDraft(question); return; }
+    pending.current = true; setThinking(true); setError(""); setDraft("");
+    const next: Turn[] = [...turnsRef.current, { id: `u-${Date.now()}`, role: "user", text: question }];
+    const controller = new AbortController(); request.current = controller;
+    const timer = setTimeout(() => controller.abort(), 65000);
+    try {
+      await persist(next);
+      const answer = urgent ? askDemoBrain(question) : await askCompanion(next, controller.signal);
+      if (!controller.signal.aborted) await persist([...next, answer]);
+    } catch (e) {
+      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "The answer could not be received. Please try again.");
+      else setError("The request timed out. Please try again.");
+    } finally { clearTimeout(timer); pending.current = false; setThinking(false); }
+  };
+  const approve = async () => {
+    try { await AsyncStorage.setItem(CHAT_CONSENT_KEY, "true"); setConsent(true); }
+    catch { setError("Your choice could not be saved. Please retry."); }
+  };
+  useEffect(() => {
+    if (!q || !loaded || !consent || askedSeed.current || turnsRef.current.length) return;
+    askedSeed.current = true; void send(String(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, loaded, consent]);
 
   return (
     <KeyboardAvoidingView
@@ -92,20 +117,27 @@ export default function Conversation() {
         ref={scrollRef}
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
-          paddingBottom: layout.tabBarHeight + insets.bottom + 90,
+          paddingBottom: 110,
         }}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {!consent && <Card style={{ padding: 18, marginTop: 20 }}>
+          <Text style={[type.h3, { color: p.text }]}>Choose before you chat</Text>
+          <Text style={[type.body, { color: p.text2, marginTop: 8 }]}>Your messages will go to NutritiScan’s server and its configured AI provider. Local profile and journal entries are not sent. When signed in to a shared account, the record tools use your confirmed shared records. Only share information you are comfortable processing this way. For adults 18+.</Text>
+          <Pressable onPress={approve} accessibilityRole="button" style={{ padding: 13, borderRadius: 99, backgroundColor: p.accent, alignItems: "center", marginTop: 14 }}><Text style={{ color: p.accentInk, fontWeight: "700" }}>I’m 18+ · Allow AI chat</Text></Pressable>
+          <Pressable onPress={() => router.push("/you")} accessibilityRole="button" style={{ padding: 12 }}><Text style={{ color: p.text2, textAlign: "center" }}>Keep using my local journal</Text></Pressable>
+        </Card>}
+        {error ? <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: 14 }]}>{error}</Text> : null}
         {turns.map((turn) => (
           <TurnView key={turn.id} turn={turn} onAsk={send} onGo={(href) => router.push(href as never)} />
         ))}
 
         {thinking && (
           <View style={styles.thinking}>
-            <ThinkingDots label="Preparing an on-device reply" />
-            <Text style={[type.meta, { color: p.text3 }]}>Preparing an on-device reply</Text>
+            <ThinkingDots label="Reviewing your question" />
+            <Text style={[type.meta, { color: p.text3 }]}>Reviewing your question</Text>
           </View>
         )}
       </ScrollView>
@@ -117,7 +149,7 @@ export default function Conversation() {
           {
             backgroundColor: p.bg,
             borderTopColor: p.border,
-            bottom: layout.tabBarHeight + insets.bottom,
+            bottom: insets.bottom,
           },
         ]}
       >
@@ -134,7 +166,7 @@ export default function Conversation() {
           />
           <Pressable
             onPress={() => send(draft)}
-            disabled={!draft.trim() || thinking}
+            disabled={!draft.trim() || thinking || !loaded}
             accessibilityRole="button"
             accessibilityLabel="Send"
             style={[

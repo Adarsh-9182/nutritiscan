@@ -16,6 +16,8 @@ export type Turn = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  /** Shared service ID, never used to authorize another account. */
+  sharedConversationId?: string;
   /** Sources this answer leaned on. Assistant turns only. */
   evidence?: Evidence[];
   /** An inline series the answer refers to. */

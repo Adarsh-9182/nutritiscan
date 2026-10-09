@@ -10,6 +10,7 @@ import { FormField } from "@/components/FormField";
 import { useScrollPadding } from "@/components/Screen";
 import { Button, Card, Divider, Eyebrow, H1, Meta } from "@/components/ui";
 import { useLocalHealth } from "@/lib/localHealth";
+import { clearChats, CHAT_CONSENT_KEY } from "@/lib/companion";
 import { radius, spacing, type } from "@/theme";
 import { useTheme, usePalette, type ThemeChoice } from "@/theme/context";
 
@@ -51,7 +52,7 @@ export default function You() {
   const eraseData = async () => {
     if (confirmText !== "DELETE" || working) return;
     setWorking(true); setActionError("");
-    try { await deleteAll(); setConfirmVisible(false); setConfirmText(""); setMessage("Your profile, meal journal and health history have been cleared from this device."); }
+    try { await clearChats(); await deleteAll(); setConfirmVisible(false); setConfirmText(""); setMessage("Your profile, journal, local history and conversations have been cleared from this device."); }
     catch { setActionError("Could not clear data. Please try again."); }
     finally { setWorking(false); }
   };
@@ -88,6 +89,10 @@ export default function You() {
         </View>
       </View>
 
+      <View style={{ marginTop: spacing.xxl }}><Eyebrow>Shared account & AI</Eyebrow>
+        <Button title="Reports, shared account & consent" icon="cloud-outline" onPress={() => router.push("/cloud-health" as never)} style={{ marginTop: spacing.md }} />
+        <Button title="Revoke public AI chat consent" variant="quiet" onPress={() => { AsyncStorage.removeItem(CHAT_CONSENT_KEY).then(() => setMessage("Public chat consent revoked. Your next conversation will ask before sending messages.")).catch(() => setActionError("Could not save your choice. Please retry.")); }} style={{ marginTop: spacing.sm }} />
+      </View>
       <View style={{ marginTop: spacing.xxl }}><Eyebrow>Appearance</Eyebrow>
         <View style={[styles.segmented, { backgroundColor: p.surface2, borderColor: p.border }]}>
           {(["dark", "light", "system"] as ThemeChoice[]).map((value) => {
@@ -122,7 +127,7 @@ export default function You() {
         </Card>
         <View style={[styles.privacy, { backgroundColor: p.surface2, borderColor: p.border }]}>
           <Ionicons name="lock-closed-outline" size={15} color={p.text3} />
-          <Text style={[type.meta, { color: p.text3, flex: 1, lineHeight: 18 }]}>This build saves your profile, health history and meal journal on this device. Barcode lookup sends only a product code to Open Food Facts. Your health data is not sent or synced. Local app storage is not encrypted by NutritiScan.</Text>
+          <Text style={[type.meta, { color: p.text3, flex: 1, lineHeight: 18 }]}>This build saves your profile, health history and meal journal on this device. Barcode lookup sends only a product code to Open Food Facts. AI chat sends only the messages you choose to send after consent. Shared records use a separate private account. Local journal and chat storage are not encrypted by NutritiScan.</Text>
         </View>
       </View>
 
@@ -136,7 +141,7 @@ export default function You() {
         <Card style={{ width: "100%", maxWidth: 380, padding: spacing.lg }}>
           <Eyebrow tone="attention">CLEAR LOCAL DATA</Eyebrow>
           <Text style={[type.h3, { color: p.text, marginTop: spacing.md }]}>Delete your health data?</Text>
-          <Meta style={{ marginTop: spacing.md, lineHeight: 20 }}>This permanently removes your profile, saved meals and health history on this device. Export a backup first if you want to keep a copy.</Meta>
+          <Meta style={{ marginTop: spacing.md, lineHeight: 20 }}>This permanently removes your profile, meals, local history and conversations on this device. Shared account data must be deleted separately from the shared dashboard. Export a backup first if you want to keep a copy.</Meta>
           <FormField label="Type DELETE to confirm" value={confirmText} onChangeText={setConfirmText} autoCapitalize="characters" placeholder="DELETE" />
           {!!actionError && <Meta style={{ color: p.attentionText, marginTop: spacing.sm }}>{actionError}</Meta>}
           <Button variant="primary" title={working ? "Clearing…" : "Delete all data"} disabled={confirmText !== "DELETE" || working} onPress={() => void eraseData()} style={{ marginTop: spacing.lg }} />

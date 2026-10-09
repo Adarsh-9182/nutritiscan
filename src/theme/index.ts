@@ -1,55 +1,4 @@
-// ============================================================
-// NUTRITISCAN — DESIGN SYSTEM v2
-// "The AI Health Operating System"
-//
-// This product's job is to LOWER THE PULSE. A person opening a
-// blood report is already anxious; a person scanning a meal is
-// already a little guilty. Every token here is chosen so the
-// interface never adds to that load.
-//
-// Three rules govern the palette. They are enforced here, at the
-// token, rather than left to each screen's judgement:
-//
-// 1. NO RED. Anywhere. Not for out-of-range labs, not for "high"
-//    markers, not for form errors. Red is the colour of
-//    emergency and this is not an emergency room. "Worth
-//    attention" gets amber; "danger" is a sentence a human
-//    writes, not a colour we paint. There is deliberately no red
-//    token below, so a component has nothing to reach for.
-//
-// 2. ONE ACCENT ON RESULTS. Amber/orange is the only accent that
-//    appears on a result surface. Green appears solely to say
-//    "this is fine, it needs nothing from you". Blue appears
-//    solely on evidence provenance.
-//
-// 3. SEMANTIC NAMES ONLY. Screens reference `attention`,
-//    `steady`, `evidence` — never a hue. Light mode is then a
-//    palette swap, not a re-layout.
-// ============================================================
-
-/**
- * Warm neutral ramp, not blue-grey.
- *
- * A pure #000/#111 grey reads clinical and cold; shifting the
- * neutrals a few degrees toward amber makes the dark theme feel
- * like a dimmed room rather than a piece of medical equipment.
- */
-const n = {
-  0: "#ffffff",
-  25: "#fdfaf7",
-  50: "#f7f2ec",
-  100: "#ece5dc",
-  200: "#d9d0c4",
-  300: "#b8ada0",
-  400: "#8f857a",
-  500: "#6b625a",
-  600: "#4e463f",
-  700: "#35302b",
-  800: "#1f1b17",
-  850: "#171410",
-  900: "#12100d",
-  950: "#0b0908",
-} as const;
+// NutritiScan shared web/mobile visual language. Semantic states remain separate.
 
 export interface Palette {
   bg: string;
@@ -103,102 +52,30 @@ export interface Palette {
  * a little lighter than the one behind it. Shadows are nearly
  * invisible on near-black and do almost no work here.
  */
+// Shared with nutritiscan.com: midnight ground, lime actions, mint evidence.
 export const dark: Palette = {
-  bg: n[950],
-  bgElevated: n[900],
-  surface: "#17130f",
-  surface2: "#1e1915",
-  surface3: "#262019",
-  border: "rgba(255,244,232,0.09)",
-  borderStrong: "rgba(255,244,232,0.17)",
-
-  text: "#f5efe8", // 16.8:1 on bg
-  text2: "#b6aca1", //  7.9:1 — secondary prose
-  text3: "#8b8177", //  4.9:1 — metadata, still AA
-
-  accent: "#f97316",
-  accentPressed: "#e35d07",
-  accentInk: "#23130a",
-  accentText: "#ff8f45", // 7.2:1 on bg
-  accentSoft: "rgba(249,115,22,0.14)",
-  accentLine: "rgba(249,115,22,0.32)",
-
-  attention: "#f6bb51",
-  attentionText: "#fbd38d",
-  attentionSoft: "rgba(246,187,81,0.13)",
-  attentionLine: "rgba(246,187,81,0.30)",
-
-  steady: "#3fa981",
-  steadyText: "#5cc79a",
-  steadySoft: "rgba(63,169,129,0.13)",
-  steadyLine: "rgba(63,169,129,0.28)",
-
-  evidence: "#5b8def",
-  evidenceText: "#7aa7f5",
-  evidenceSoft: "rgba(91,141,239,0.15)",
-  evidenceLine: "rgba(91,141,239,0.30)",
-
-  chartLine: "#f97316",
-  chartAlt: "#f6bb51",
-  chartGrid: "rgba(255,244,232,0.10)",
-
-  overlay: "rgba(0,0,0,0.55)",
-  overlayText: "rgba(255,255,255,0.92)",
+  bg: "#05080a", bgElevated: "#090e0c", surface: "#0e1613", surface2: "#14201b", surface3: "#1c2c24",
+  border: "rgba(203,235,215,0.12)", borderStrong: "rgba(203,235,215,0.23)",
+  text: "#e9f2ec", text2: "#a3b5a9", text3: "#869b8d",
+  accent: "#c9fa63", accentPressed: "#b5e74f", accentInk: "#102015", accentText: "#c9fa63",
+  accentSoft: "rgba(201,250,99,0.09)", accentLine: "rgba(201,250,99,0.25)",
+  attention: "#eac095", attentionText: "#edc9a4", attentionSoft: "rgba(234,192,149,0.10)", attentionLine: "rgba(234,192,149,0.28)",
+  steady: "#6fe8b4", steadyText: "#8be9be", steadySoft: "rgba(111,232,180,0.09)", steadyLine: "rgba(111,232,180,0.23)",
+  evidence: "#6fe8b4", evidenceText: "#8cebc3", evidenceSoft: "rgba(111,232,180,0.09)", evidenceLine: "rgba(111,232,180,0.23)",
+  chartLine: "#c9fa63", chartAlt: "#6fe8b4", chartGrid: "rgba(203,235,215,0.10)",
+  overlay: "rgba(5,8,10,0.7)", overlayText: "#e9f2ec",
 };
-
-/**
- * Light.
- *
- * Two real differences from dark:
- *  - ELEVATION carries hierarchy. On cream, a lighter surface is
- *    invisible, so cards separate with shadow + a hairline.
- *  - ACCENT-AS-TEXT DARKENS. #f97316 on cream is ~2.9:1 and fails
- *    WCAG AA outright. Every "colour as text" token steps down two
- *    stops so badges and links clear 4.5:1. This is the single most
- *    common accessibility failure in a themed design system, and it
- *    is fixed once here rather than per screen.
- */
 export const light: Palette = {
-  bg: n[25],
-  bgElevated: n[50],
-  surface: "#ffffff",
-  surface2: n[50],
-  surface3: n[100],
-  border: "rgba(53,48,43,0.11)",
-  borderStrong: "rgba(53,48,43,0.20)",
-
-  text: "#1c1815", // 15.9:1 on bg
-  text2: "#57504a", //  7.6:1
-  text3: "#7b736b", //  4.7:1 — AA for metadata
-
-  accent: "#e35d07",
-  accentPressed: "#c2410c",
-  accentInk: "#ffffff",
-  accentText: "#c2410c", // 5.6:1 on cream
-  accentSoft: "rgba(249,115,22,0.11)",
-  accentLine: "rgba(226,93,7,0.28)",
-
-  attention: "#eaa131",
-  attentionText: "#86530c", // 5.9:1 on cream
-  attentionSoft: "rgba(234,161,49,0.16)",
-  attentionLine: "rgba(234,161,49,0.38)",
-
-  steady: "#3fa981",
-  steadyText: "#175942", // 6.4:1 on the soft green card
-  steadySoft: "rgba(63,169,129,0.14)",
-  steadyLine: "rgba(63,169,129,0.34)",
-
-  evidence: "#5b8def",
-  evidenceText: "#24488f", // 6.8:1
-  evidenceSoft: "rgba(91,141,239,0.13)",
-  evidenceLine: "rgba(91,141,239,0.32)",
-
-  chartLine: "#e35d07",
-  chartAlt: "#eaa131",
-  chartGrid: "rgba(53,48,43,0.12)",
-
-  overlay: "rgba(0,0,0,0.55)",
-  overlayText: "rgba(255,255,255,0.92)",
+  bg: "#f6faf5", bgElevated: "#edf3ed", surface: "#ffffff", surface2: "#edf3ed", surface3: "#e1eae1",
+  border: "rgba(16,32,21,0.12)", borderStrong: "rgba(16,32,21,0.23)",
+  text: "#102015", text2: "#445b4b", text3: "#5f7565",
+  accent: "#c9fa63", accentPressed: "#b5e74f", accentInk: "#102015", accentText: "#3b6017",
+  accentSoft: "rgba(141,193,45,0.12)", accentLine: "rgba(94,133,25,0.30)",
+  attention: "#b07835", attentionText: "#7d4d15", attentionSoft: "rgba(176,120,53,0.09)", attentionLine: "rgba(176,120,53,0.28)",
+  steady: "#237a52", steadyText: "#1c6041", steadySoft: "rgba(35,122,82,0.09)", steadyLine: "rgba(35,122,82,0.23)",
+  evidence: "#237a52", evidenceText: "#1c6041", evidenceSoft: "rgba(35,122,82,0.09)", evidenceLine: "rgba(35,122,82,0.23)",
+  chartLine: "#547f1d", chartAlt: "#237a52", chartGrid: "rgba(16,32,21,0.10)",
+  overlay: "rgba(5,8,10,0.7)", overlayText: "#e9f2ec",
 };
 
 /** 4pt base. */
@@ -315,14 +192,14 @@ export const elevation = {
   },
   /** Legacy alias for the pre-v2 Button. */
   glow: {
-    shadowColor: "#f97316",
+    shadowColor: "#c9fa63",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
     elevation: 10,
   },
   accent: {
-    shadowColor: "#f97316",
+    shadowColor: "#c9fa63",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
     shadowRadius: 18,

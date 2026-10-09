@@ -50,3 +50,7 @@ example
 supabase/.temp
 supabase/.branches
 .gstack/
+
+# Persistent release signing materials: never commit.
+.credentials/
+*.apk
