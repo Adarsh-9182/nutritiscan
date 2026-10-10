@@ -26,5 +26,5 @@
   <text x="80" y="353" fill="#B3C0B7" font-family="Arial, sans-serif" font-size="23">A private journal for meals, health notes and questions for your doctor.</text>
   <path d="M80 403h864" stroke="#FFFFFF" stroke-opacity=".12"/>
   <circle cx="89" cy="442" r="5" fill="#9AE8C0"/>
-  <text x="106" y="449" fill="#B3C0B7" font-family="Arial, sans-serif" font-size="16">Educational support · Adults 18+ · Not a diagnosis or emergency service</text>
+  <text x="106" y="449" fill="#B3C0B7" font-family="Arial, sans-serif" font-size="16">Educational support for all ages · Not a diagnosis or emergency service</text>
 </svg>

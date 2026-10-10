@@ -10,4 +10,4 @@ Included:
 
 The shared FastAPI service must be deployed and connected to the website to activate private cloud reports and shared account features. The app shows its connection status. Public chat also depends on the matching web update being deployed. An unavailable AI service is disclosed rather than presented as a personal assessment.
 
-Educational prototype for adults 18+. Not a diagnosis, prescription or emergency service. The engineering safety rules have not completed clinical validation. Local journal and conversation storage are not encrypted by NutritiScan. No real patient data is included in this release.
+Educational prototype for all ages. Younger users should involve a parent or guardian when sharing personal health information. Not a diagnosis, prescription or emergency service. The engineering safety rules have not completed clinical validation. Local journal and conversation storage are not encrypted by NutritiScan. No real patient data is included in this release.

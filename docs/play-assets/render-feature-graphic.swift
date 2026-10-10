@@ -51,7 +51,7 @@ line("A private journal for meals, health notes and questions for your doctor.",
 
 bitmap.setStrokeColor(color(1, 1, 1, 0.12)); bitmap.setLineWidth(1); bitmap.move(to: CGPoint(x: 80, y: 97)); bitmap.addLine(to: CGPoint(x: 944, y: 97)); bitmap.strokePath()
 bitmap.setFillColor(color(0.60, 0.91, 0.75)); bitmap.fillEllipse(in: CGRect(x: 84, y: 54, width: 10, height: 10))
-line("Educational support · Adults 18+ · Not a diagnosis or emergency service", "ArialMT", 16, color(0.70, 0.75, 0.72), 106, 55)
+line("Educational support for all ages · Not a diagnosis or emergency service", "ArialMT", 16, color(0.70, 0.75, 0.72), 106, 55)
 
 let image = bitmap.makeImage()!
 let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.png.identifier as CFString, 1, nil)!

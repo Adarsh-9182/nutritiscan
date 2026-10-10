@@ -26,6 +26,22 @@ test("malformed, duplicate and unsafe nutrition payloads are rejected", () => {
   assert.throws(() => decodeHealthData(JSON.stringify({ version: 42, meals: [] })), /not supported/);
   assert.throws(() => decodeHealthData(JSON.stringify({ profile: { name: "User" }, meals: [] })), /profile details/);
 });
+test("profiles accept younger ages and child-sized measurements", () => {
+  const profile = {
+    name: "Sample child",
+    age: 8,
+    heightCm: 125,
+    weightKg: 24,
+    allergies: [],
+    conditions: [],
+    goals: [],
+    updatedAt: "2026-10-09T12:00:00.000Z",
+  };
+  const data = decodeHealthData(JSON.stringify({ version: 2, profile, meals: [] }));
+  assert.equal(data.profile.age, 8);
+  assert.equal(data.profile.heightCm, 125);
+  assert.equal(data.profile.weightKg, 24);
+});
 test("concurrent saves preserve both entries, including after a fresh launch", async () => {
   const disk = storage(); let current;
   const repo = new HealthRepository(disk, data => { current = data; }); await repo.load();

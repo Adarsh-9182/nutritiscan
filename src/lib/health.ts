@@ -121,9 +121,14 @@ export async function logWeight(
     .insert({ user_id: userId, weight_kg: weightKg });
   if (error) throw new Error(error.message);
 
-  const update: Record<string, unknown> = { weight_kg: weightKg };
+  const update: Record<string, unknown> = {
+    weight_kg: weightKg,
+    target_calories: null,
+    target_protein_g: null,
+    target_water_ml: null,
+  };
   if (
-    profile?.age &&
+    profile !== null && profile.age !== null && profile.age >= 18 &&
     profile.sex &&
     profile.height_cm &&
     profile.activity_level

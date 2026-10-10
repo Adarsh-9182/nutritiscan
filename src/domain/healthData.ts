@@ -30,8 +30,8 @@ function list(value: unknown) {
 }
 export function validateProfile(value: unknown): HealthProfile {
   const p = object(value);
-  return { name: text(p.name, "name", 60), age: number(p.age, "age", 18, 120),
-    heightCm: number(p.heightCm, "height", 90, 250), weightKg: number(p.weightKg, "weight", 25, 350),
+  return { name: text(p.name, "name", 60), age: number(p.age, "age", 0, 120),
+    heightCm: number(p.heightCm, "height", 30, 250), weightKg: number(p.weightKg, "weight", 0.5, 350),
     allergies: list(p.allergies), conditions: list(p.conditions), goals: list(p.goals), updatedAt: date(p.updatedAt) };
 }
 export function validateMeal(value: unknown): MealLog {

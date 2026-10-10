@@ -1,6 +1,6 @@
 # NutritiScan · Android
 
-NutritiScan is a conversation-first educational health companion for adults 18+, built with Expo SDK 57 and React Native. The midnight/lime/mint design and plus mark match [nutritiscan.com](https://nutritiscan.com).
+NutritiScan is a conversation-first educational health companion for people and families of all ages, built with Expo SDK 57 and React Native. Younger users should involve a parent or guardian when sharing personal health information. The midnight/lime/mint design and plus mark match [nutritiscan.com](https://nutritiscan.com).
 
 [Download the Android APK](https://github.com/Adarsh-9182/nutritiscan/releases) from GitHub Releases. The signed standalone APK includes its JavaScript bundle; Expo Go is not needed.
 

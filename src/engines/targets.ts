@@ -52,6 +52,10 @@ export function computeTargets(input: TargetInput): DailyTargets {
     weeklyPaceKg,
   } = input;
 
+  if (age < 18) {
+    throw new Error("Personalized nutrition targets are not calculated for users under 18.");
+  }
+
   // Mifflin-St Jeor. For "other", average the male/female constants.
   const sexConstant = sex === "male" ? 5 : sex === "female" ? -161 : -78;
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + sexConstant;

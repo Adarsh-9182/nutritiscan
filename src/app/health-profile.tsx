@@ -37,7 +37,7 @@ function ProfileForm({ profile }: { profile: HealthProfile | null }) {
     setSaving(true); setError("");
     try {
       if (name.trim().length < 2 || name.trim().length > 60) throw new Error("Enter a name between 2 and 60 characters.");
-      await saveProfile({ name: name.trim(), age: optionalNumber(age, "Age", 18, 120), heightCm: optionalNumber(height, "Height", 90, 250), weightKg: optionalNumber(weight, "Weight", 25, 350), allergies: csv(allergies), conditions: csv(conditions), goals: csv(goals) });
+      await saveProfile({ name: name.trim(), age: optionalNumber(age, "Age", 0, 120), heightCm: optionalNumber(height, "Height", 30, 250), weightKg: optionalNumber(weight, "Weight", 0.5, 350), allergies: csv(allergies), conditions: csv(conditions), goals: csv(goals) });
       if (router.canGoBack()) router.back(); else router.replace("/you");
     } catch (err) { setError(err instanceof Error ? err.message : "Could not save your profile. Try again."); requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: true })); }
     finally { setSaving(false); }
@@ -49,8 +49,9 @@ function ProfileForm({ profile }: { profile: HealthProfile | null }) {
       <Card style={{ marginTop: spacing.lg, padding: spacing.base }}>
         <Eyebrow>ABOUT YOU</Eyebrow>
         <FormField label="Name" value={name} onChangeText={setName} placeholder="What should we call you?" maxLength={60} autoComplete="name" />
-        <View style={{ flexDirection: "row", gap: spacing.md }}><View style={{ flex: 1 }}><FormField label="Age · 18+" value={age} onChangeText={setAge} placeholder="Optional" keyboardType="number-pad" maxLength={3} /></View><View style={{ flex: 1 }}><FormField label="Height · cm" value={height} onChangeText={setHeight} placeholder="Optional" keyboardType="decimal-pad" maxLength={6} /></View></View>
+        <View style={{ flexDirection: "row", gap: spacing.md }}><View style={{ flex: 1 }}><FormField label="Age · optional" value={age} onChangeText={setAge} placeholder="Optional" keyboardType="number-pad" maxLength={3} /></View><View style={{ flex: 1 }}><FormField label="Height · cm" value={height} onChangeText={setHeight} placeholder="Optional" keyboardType="decimal-pad" maxLength={6} /></View></View>
         <FormField label="Weight · kg" value={weight} onChangeText={setWeight} placeholder="Optional" keyboardType="decimal-pad" maxLength={6} />
+        <Meta style={{ marginTop: spacing.sm, lineHeight: 18 }}>If this profile is for someone under 18, a parent or guardian should help manage health information. Personalized nutrition targets are only calculated for adults.</Meta>
       </Card>
       <Card style={{ marginTop: spacing.md, padding: spacing.base }}>
         <Eyebrow>YOUR CONTEXT</Eyebrow>

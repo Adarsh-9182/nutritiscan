@@ -125,8 +125,8 @@ export default function Conversation() {
       >
         {!consent && <Card style={{ padding: 18, marginTop: 20 }}>
           <Text style={[type.h3, { color: p.text }]}>Choose before you chat</Text>
-          <Text style={[type.body, { color: p.text2, marginTop: 8 }]}>Your messages will go to NutritiScan’s server and its configured AI provider. Local profile and journal entries are not sent. When signed in to a shared account, the record tools use your confirmed shared records. Only share information you are comfortable processing this way. For adults 18+.</Text>
-          <Pressable onPress={approve} accessibilityRole="button" style={{ padding: 13, borderRadius: 99, backgroundColor: p.accent, alignItems: "center", marginTop: 14 }}><Text style={{ color: p.accentInk, fontWeight: "700" }}>I’m 18+ · Allow AI chat</Text></Pressable>
+          <Text style={[type.body, { color: p.text2, marginTop: 8 }]}>Your messages will go to NutritiScan’s server and its configured AI provider. Local profile and journal entries are not sent. When signed in to a shared account, the record tools use your confirmed shared records. Only share information you are comfortable processing this way. If you are under 18, ask a parent or guardian to review this before you continue.</Text>
+          <Pressable onPress={approve} accessibilityRole="button" style={{ padding: 13, borderRadius: 99, backgroundColor: p.accent, alignItems: "center", marginTop: 14 }}><Text style={{ color: p.accentInk, fontWeight: "700" }}>I understand · Allow AI chat</Text></Pressable>
           <Pressable onPress={() => router.push("/you")} accessibilityRole="button" style={{ padding: 12 }}><Text style={{ color: p.text2, textAlign: "center" }}>Keep using my local journal</Text></Pressable>
         </Card>}
         {error ? <Text accessibilityRole="alert" style={[type.meta, { color: p.attentionText, marginTop: 14 }]}>{error}</Text> : null}

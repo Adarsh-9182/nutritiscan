@@ -65,7 +65,7 @@ export default function You() {
         <View style={[styles.avatar, { backgroundColor: p.accentSoft }]}><Text style={{ color: p.accentText, fontSize: 15, fontWeight: "700" }}>{profile?.name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() || "?"}</Text></View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <H1>{profile?.name || "Your profile"}</H1>
-          <Meta style={{ marginTop: 3 }}>{profile ? [profile.age ? `${profile.age} years` : null, profile.heightCm ? `${profile.heightCm} cm` : null, profile.weightKg ? `${profile.weightKg} kg` : null].filter(Boolean).join(" · ") || "Profile saved on this device" : "No profile details added yet"}</Meta>
+          <Meta style={{ marginTop: 3 }}>{profile ? [profile.age !== undefined ? `${profile.age} years` : null, profile.heightCm ? `${profile.heightCm} cm` : null, profile.weightKg ? `${profile.weightKg} kg` : null].filter(Boolean).join(" · ") || "Profile saved on this device" : "No profile details added yet"}</Meta>
         </View>
       </View>
 

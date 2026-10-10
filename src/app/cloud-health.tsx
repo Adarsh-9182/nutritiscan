@@ -17,7 +17,7 @@ export default function CloudHealth() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
-  const [register, setRegister] = useState(false); const [adult, setAdult] = useState(false);
+  const [register, setRegister] = useState(false);
   const [storage, setStorage] = useState(false); const [cloud, setCloud] = useState(false);
   const [reports, setReports] = useState<Report[]>([]); const [selected, setSelected] = useState<Report | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]); const [compared, setCompared] = useState(false);
@@ -25,7 +25,7 @@ export default function CloudHealth() {
   const run = async (task: () => Promise<void>) => { if (busy) return; setBusy(true); setError(""); try { await task(); } catch (e) { setError(e instanceof Error ? e.message : "The request failed."); } finally { setBusy(false); } };
   const refresh = async () => { const result = await healthRequest("documents"); setReports(result.documents); };
   useEffect(() => { let active = true; healthRequest("status").then(async () => { if (!active) return; setAvailable(true); try { const c = await healthRequest("consent"); if (!active) return; setSignedIn(true); setStorage(c.storage); setCloud(c.cloud_ai); if (c.storage) { const d = await healthRequest("documents"); if (active) setReports(d.documents); } } catch { /* Sign-in remains visible. */ } }).catch(() => { if (active) setAvailable(false); }); return () => { active = false; }; }, []);
-  const signIn = () => run(async () => { await healthRequest(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify({ email, password, adult }) }); setPassword(""); setSignedIn(true); const c = await healthRequest("consent"); setStorage(c.storage); setCloud(c.cloud_ai); if (c.storage) await refresh(); });
+  const signIn = () => run(async () => { await healthRequest(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify({ email, password }) }); setPassword(""); setSignedIn(true); const c = await healthRequest("consent"); setStorage(c.storage); setCloud(c.cloud_ai); if (c.storage) await refresh(); });
   const upload = () => run(async () => { const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/png", "image/jpeg"], copyToCacheDirectory: true }); if (result.canceled) return; const file = result.assets[0]; if ((file.size ?? 0) > 10 * 1024 * 1024) throw new Error("Use a report smaller than 10 MB."); let body: FormData; if (Platform.OS === "web") { body = new FormData(); body.append("file", await (await fetch(file.uri)).blob(), file.name); } else body = uploadForm(file.uri, file.name, file.mimeType ?? "application/pdf"); await healthRequest("documents", { method: "POST", body }); await refresh(); });
   const review = (report: Report) => { setSelected(report); setCandidates(report.candidates.map((c) => ({ ...c }))); setCompared(false); setDate(""); };
   return <View style={{ flex: 1, backgroundColor: p.bg }}><ScreenHeader backTo="/" title="Reports & shared health" /><ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
@@ -34,8 +34,8 @@ export default function CloudHealth() {
       <Text style={[type.h2, { color: p.text }]}>{register ? "Create your health account" : "Welcome back"}</Text>
       <FormField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <FormField label="Password (at least 12 characters)" value={password} onChangeText={setPassword} secureTextEntry />
-      {register && <Toggle checked={adult} label="I am 18 or older" onPress={() => setAdult(!adult)} />}
-      <Button title={busy ? "Please wait…" : register ? "Create account" : "Sign in"} variant="primary" disabled={busy || !email || password.length < 12 || (register && !adult)} onPress={signIn} style={{ marginTop: 18 }} />
+      {register && <Meta style={{ marginTop: 10 }}>Younger users should ask a parent or guardian to create and manage their account. Verified guardian consent for a child&apos;s health records is not available yet.</Meta>}
+      <Button title={busy ? "Please wait…" : register ? "Create account" : "Sign in"} variant="primary" disabled={busy || !email || password.length < 12} onPress={signIn} style={{ marginTop: 18 }} />
       <Button title={register ? "Already have an account? Sign in" : "New here? Create an account"} variant="quiet" onPress={() => setRegister(!register)} style={{ marginTop: 8 }} />
     </Card> : <>
       <Card style={{ padding: 18, marginTop: 22 }}><Eyebrow>Your choices</Eyebrow><Toggle checked={storage} label="Store my health records on NutritiScan’s private service" onPress={() => setStorage(!storage)} /><Toggle checked={cloud} label="Allow my records and voice audio to be processed by the configured AI provider" onPress={() => setCloud(!cloud)} /><Meta style={{ marginTop: 10 }}>AI processing is optional. Patient records are not used by NutritiScan for model training.</Meta><Button title="Save consent choices" disabled={busy} onPress={() => run(async () => { await healthRequest("consent", { method: "PUT", body: JSON.stringify({ storage, cloud_ai: cloud }) }); if (storage) await refresh(); })} style={{ marginTop: 14 }} /></Card>
